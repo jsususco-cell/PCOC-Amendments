@@ -63,8 +63,8 @@ export default function App() {
   }, []);
 
   if (auth === "checking") return <Splash text="Opening…" />;
-  if (auth === "unconfigured") return <Splash text="This deployment is not set up yet: QB_USER_TOKEN and a way to sign in (Google or APP_PASSWORD) must be set in Vercel." />;
-  if (auth === "out") return <><Login info={info} onIn={check} /><Toaster richColors position="bottom-right" /></>;
+  if (auth === "unconfigured") return <Splash text="This deployment is not set up yet: QB_USER_TOKEN, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET and AUTH_SECRET must be set in Vercel." />;
+  if (auth === "out") return <><Login info={info} /><Toaster richColors position="bottom-right" /></>;
 
   return (
     <BrowserRouter>

@@ -2,7 +2,7 @@
  * The signed-in person's session (Google Workspace sign-in). SERVER ONLY.
  *
  * Same scheme as the Permitting Helper: a sealed cookie carrying who the
- * person is, HMAC-signed with AUTH_SECRET (falls back to APP_PASSWORD).
+ * person is, HMAC-signed with AUTH_SECRET.
  * It carries no roles: everyone on the domain can do everything here.
  */
 import { createHmac, timingSafeEqual } from "node:crypto";
@@ -19,11 +19,12 @@ export interface Identity {
   exp: number;
 }
 
+/** AUTH_SECRET signs the sessions. Under 32 characters counts as not set. */
 function secret(): string {
   const explicit = process.env.AUTH_SECRET?.trim() ?? "";
-  if (explicit.length >= 32) return explicit;
-  return process.env.APP_PASSWORD?.trim() ?? "";
+  return explicit.length >= 32 ? explicit : "";
 }
+export const secretConfigured = () => secret() !== "";
 
 const b64url = (b: Buffer) => b.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 const fromB64url = (s: string) => Buffer.from(s.replace(/-/g, "+").replace(/_/g, "/"), "base64");

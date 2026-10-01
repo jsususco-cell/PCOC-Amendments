@@ -1,22 +1,21 @@
 /**
- * Signing in.
+ * Signing in — Google Workspace only.
  *
- *   GET    /api/session        who is signed in, and which ways in this deployment offers
- *   POST   /api/session        { "password": "..." } — the fallback password path
+ *   GET    /api/session        who is signed in
  *   DELETE /api/session        signs out
  *
- *   GET    /api/auth/start     begins Google sign-in        (rewrite → ?action=start)
+ *   GET    /api/auth/start     begins Google sign-in          (rewrite → ?action=start)
  *   GET    /api/auth/callback  where Google sends people back (rewrite → ?action=callback)
  *   GET    /api/auth/signout   signs out and returns to the app
  *
  * Google matches redirect URIs character for character, so the registered URI
  * is the clean /api/auth/callback path (see vercel.json rewrites).
  */
-import { checkPassword, clearCookie, configured, hasPasswordSession, json, passwordEnabled, sessionCookie } from "./_lib/auth.js";
+import { configured, json } from "./_lib/auth.js";
 import {
   STATE_COOKIE, allowedDomain, authorizeUrl, exchangeCode, googleConfigured, isAllowedIdentity, pkceChallenge, randomToken,
 } from "./_lib/google-auth.js";
-import { clearCookie as clearIdentity, issueCookie as issueIdentity, newIdentity, open as openIdentity, readState, safeNext, stateCookie } from "./_lib/identity.js";
+import { clearCookie, issueCookie, newIdentity, open as openIdentity, readState, safeNext, stateCookie } from "./_lib/identity.js";
 
 function redirect(to: string, cookies: string[] = []): Response {
   const headers = new Headers({ Location: to, "Cache-Control": "no-store" });
@@ -28,7 +27,7 @@ const refuse = (reason: string) => redirect(`/?auth=${encodeURIComponent(reason)
 
 async function start(req: Request): Promise<Response> {
   const url = new URL(req.url);
-  if (!googleConfigured()) return redirect("/?auth=unconfigured");
+  if (!configured()) return redirect("/?auth=unconfigured");
   const next = safeNext(url.searchParams.get("next"));
   const state = randomToken();
   const verifier = randomToken(48);
@@ -59,7 +58,7 @@ async function callback(req: Request): Promise<Response> {
   if (!isAllowedIdentity(identity)) return refuse("domain");
 
   return redirect(safeNext(stored.next), [
-    issueIdentity(newIdentity({ sub: identity.sub, email: identity.email, name: identity.name, picture: identity.picture })),
+    issueCookie(newIdentity({ sub: identity.sub, email: identity.email, name: identity.name, picture: identity.picture })),
     stateCookie(STATE_COOKIE, "", 0),
   ]);
 }
@@ -68,38 +67,18 @@ export async function GET(req: Request): Promise<Response> {
   const action = new URL(req.url).searchParams.get("action");
   if (action === "start") return start(req);
   if (action === "callback") return callback(req);
-  if (action === "signout") return redirect("/", [clearIdentity(), clearCookie()]);
+  if (action === "signout") return redirect("/", [clearCookie()]);
 
   const id = openIdentity(req);
   return json({
     configured: configured(),
-    authed: id !== null || hasPasswordSession(req),
+    authed: id !== null,
     google: googleConfigured(),
-    password: passwordEnabled(),
     domain: allowedDomain(),
     user: id ? { email: id.email, name: id.name, picture: id.picture } : null,
   });
 }
 
-export async function POST(req: Request): Promise<Response> {
-  if (!configured()) return json({ error: "This deployment is not configured." }, 503);
-  if (!passwordEnabled()) return json({ error: "Password sign-in is turned off. Use Google." }, 400);
-  let given = "";
-  try {
-    given = String(((await req.json()) as { password?: string }).password ?? "");
-  } catch {
-    return json({ error: "Send the password." }, 400);
-  }
-  if (!checkPassword(given)) {
-    await new Promise((r) => setTimeout(r, 600));
-    return json({ error: "That password is not right." }, 401);
-  }
-  return json({ authed: true }, 200, { "Set-Cookie": sessionCookie() });
-}
-
 export async function DELETE(): Promise<Response> {
-  const h = new Headers();
-  h.append("Set-Cookie", clearIdentity());
-  h.append("Set-Cookie", clearCookie());
-  return json({ authed: false }, 200, h);
+  return json({ authed: false }, 200, { "Set-Cookie": clearCookie() });
 }

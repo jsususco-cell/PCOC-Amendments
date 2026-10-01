@@ -1,12 +1,9 @@
-import { useState } from "react";
 import { FileCheck2, Lock } from "lucide-react";
-import { Btn } from "@/components/ui";
 
 export interface SessionInfo {
   configured: boolean;
   authed: boolean;
   google: boolean;
-  password: boolean;
   domain: string;
   user: { email: string; name: string; picture?: string } | null;
 }
@@ -32,32 +29,9 @@ function GoogleMark() {
   );
 }
 
-export default function Login({ info, onIn }: { info: SessionInfo | null; onIn: () => void }) {
-  const [pw, setPw] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState(() => REASONS[new URLSearchParams(location.search).get("auth") ?? ""] ?? "");
-  const google = info?.google ?? false;
-  const password = info?.password ?? true;
+export default function Login({ info }: { info: SessionInfo | null }) {
+  const err = REASONS[new URLSearchParams(location.search).get("auth") ?? ""] ?? "";
   const next = location.pathname + location.search.replace(/[?&]auth=[^&]*/, "").replace(/^&/, "?");
-
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setBusy(true);
-    setErr("");
-    try {
-      const r = await fetch("/api/session", {
-        method: "POST", credentials: "same-origin",
-        headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password: pw }),
-      });
-      const j = await r.json();
-      if (!r.ok) throw new Error(j.error || "Could not sign in.");
-      onIn();
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
-    } finally {
-      setBusy(false);
-    }
-  };
 
   return (
     <div className="min-h-screen">
@@ -72,29 +46,11 @@ export default function Login({ info, onIn }: { info: SessionInfo | null; onIn: 
       </header>
       <div className="card mx-auto mt-16 max-w-sm p-6">
         <h1 className="m-0 flex items-center gap-2 text-lg font-bold"><Lock className="h-4 w-4" />Sign in</h1>
-        {google && (
-          <>
-            <p className="mb-4 mt-1 text-xs text-mute">Use your {info?.domain ? `@${info.domain}` : "Byrdson"} Google account.</p>
-            <a href={`/api/auth/start?next=${encodeURIComponent(next || "/")}`}
-              className="btn w-full border-line bg-white text-ink no-underline hover:border-navy hover:text-ink">
-              <GoogleMark />Sign in with Google
-            </a>
-          </>
-        )}
-        {google && password && (
-          <div className="my-4 flex items-center gap-3 text-[11px] uppercase tracking-wider text-mute">
-            <span className="h-px flex-1 bg-line" />or the team password<span className="h-px flex-1 bg-line" />
-          </div>
-        )}
-        {password && (
-          <form onSubmit={submit}>
-            {!google && <p className="mb-4 mt-1 text-xs text-mute">Use the team password.</p>}
-            <label className="label">Password
-              <input type="password" autoFocus={!google} className="input" value={pw} onChange={(e) => setPw(e.target.value)} />
-            </label>
-            <Btn type="submit" kind={google ? "outline" : "primary"} busy={busy} className="mt-3 w-full">Sign in with the password</Btn>
-          </form>
-        )}
+        <p className="mb-4 mt-1 text-xs text-mute">Use your @{info?.domain || "byrdsonservices.com"} Google account.</p>
+        <a href={`/api/auth/start?next=${encodeURIComponent(next || "/")}`}
+          className="btn w-full border-line bg-white text-ink no-underline hover:border-navy hover:text-ink">
+          <GoogleMark />Sign in with Google
+        </a>
         {err && <p className="mt-3 text-[13px] text-bad-ink">{err}</p>}
       </div>
     </div>

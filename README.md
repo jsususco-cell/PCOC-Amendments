@@ -31,7 +31,7 @@ browser ── React UI (src/) ──► public/engine.js       logic lifted ver
             ▼
 Vercel ── api/qb.ts   allowlisted Quickbase XML-API proxy (adds the server's user token)
           api/up.ts   file relay for /up/… attachments
-          api/session.ts   Google Workspace sign-in (+ team password fallback)
+          api/session.ts   Google Workspace sign-in (byrdsonservices.com only)
             ▼
 Quickbase, Construction Management_V2 (buskqh26r)
 ```
@@ -60,7 +60,7 @@ Page 177 did its background work every time anyone opened it. The work: create c
 ## Run locally
 
 ```bash
-cp .env.example .env.local     # fill QB_USER_TOKEN and APP_PASSWORD
+cp .env.example .env.local     # fill QB_USER_TOKEN, the Google client and AUTH_SECRET
 npm install
 npm run dev                    # http://localhost:8080, /api runs in-process
 ```
@@ -71,13 +71,20 @@ npm run dev                    # http://localhost:8080, /api runs in-process
 2. Set the environment variables (Production and Preview):
    * `QB_REALM` = `byrdsonservices.quickbase.com`
    * `QB_USER_TOKEN`: a user token with access to Construction Management_V2
-   * `APP_PASSWORD`: the team password. Changing it signs everyone out.
-3. Deploy. `/api/health` reports `configured: true` when both secrets are set. The app refuses to serve Quickbase data without a password.
+   * `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`: the Google OAuth client (shared with the Permitting Helper)
+   * `AUTH_ALLOWED_DOMAIN` = `byrdsonservices.com`
+   * `AUTH_SECRET`: 32+ random characters; it signs the sessions. Changing it signs everyone out.
+3. In Google Cloud Console, add `https://<your-domain>/api/auth/callback` to the OAuth client's **Authorized redirect URIs**.
+4. Deploy. `/api/health` reports `configured: true` when everything is set. The app refuses to serve Quickbase data without it.
+
+## Sign-in
+
+Google Workspace only: byrdsonservices.com accounts, the same flow as the Permitting Helper. The domain is checked on the server, not just hinted to Google's account chooser. There is no shared password. A session lasts 12 hours. To remove someone's access, disable their Workspace account.
 
 ## Limits
 
 * Uploads go through a serverless function, which caps the request body at about 4.5 MB. Base64 adds a third, so keep files under about 3 MB. Larger files go in the case's Drive folder.
-* Sign-in is Google Workspace (byrdsonservices.com only), the same flow as the Permitting Helper, with the team password as a fallback. Quickbase still records the token's owner as the author of every change. The app fills the signed-in name into "Who went" and "Paid by".
+* Quickbase still records the token's owner as the author of every change. The app fills the signed-in name into "Who went", "Paid by" and "pasted in Canopy by".
 
 ## Regenerating the engine from page 177
 
