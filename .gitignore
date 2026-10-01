@@ -1,0 +1,11 @@
+node_modules
+dist
+.env
+.env.local
+.env.*.local
+.vercel
+page177.html
+*.log
+.DS_Store
+*.tsbuildinfo
+.claude
