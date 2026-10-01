@@ -9,3 +9,6 @@ page177.html
 .DS_Store
 *.tsbuildinfo
 .claude
+
+.vercel
+.env*
