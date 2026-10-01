@@ -14,7 +14,15 @@ export function apiRoutes(): Plugin {
       server.middlewares.use(async (req: IncomingMessage, res: ServerResponse, next: () => void) => {
         const url = req.url ?? "";
         if (!url.startsWith("/api/")) return next();
-        const route = url.split("?")[0].replace(/^\/api\//, "").replace(/\/$/, "");
+        let route = url.split("?")[0].replace(/^\/api\//, "").replace(/\/$/, "");
+        // Same rewrites as vercel.json: /api/auth/<action> -> /api/session?action=<action>
+        const auth = route.match(/^auth\/(start|callback|signout)$/);
+        if (auth) {
+          const q = new URL(url, "http://x").searchParams;
+          q.set("action", auth[1]);
+          route = "session";
+          req.url = `/api/session?${q.toString()}`;
+        }
         if (!route || route.startsWith("_") || route.includes("..")) return send(res, 404, { error: "No such route" });
         try {
           const mod = await server.ssrLoadModule(`/api/${route}.ts`);
@@ -25,8 +33,8 @@ export function apiRoutes(): Plugin {
           res.statusCode = response.status;
           response.headers.forEach((v, k) => { if (k.toLowerCase() !== "set-cookie") res.setHeader(k, v); });
           const cookies = response.headers.getSetCookie?.() ?? [];
-          // Local dev runs on http: drop Secure so the browser keeps the cookie.
-          if (cookies.length) res.setHeader("Set-Cookie", cookies.map((c) => c.replace(/;\s*Secure/i, "")));
+          // Kept Secure: browsers treat http://localhost as a secure context, and SameSite=None requires it.
+          if (cookies.length) res.setHeader("Set-Cookie", cookies);
           res.end(Buffer.from(await response.arrayBuffer()));
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);

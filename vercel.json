@@ -4,8 +4,29 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "functions": {
-    "api/qb.ts": { "maxDuration": 60 },
-    "api/up.ts": { "maxDuration": 60 }
+    "api/qb.ts": {
+      "maxDuration": 60
+    },
+    "api/up.ts": {
+      "maxDuration": 60
+    }
   },
-  "rewrites": [{ "source": "/((?!api/).*)", "destination": "/index.html" }]
+  "rewrites": [
+    {
+      "source": "/api/auth/start",
+      "destination": "/api/session?action=start"
+    },
+    {
+      "source": "/api/auth/callback",
+      "destination": "/api/session?action=callback"
+    },
+    {
+      "source": "/api/auth/signout",
+      "destination": "/api/session?action=signout"
+    },
+    {
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
+    }
+  ]
 }

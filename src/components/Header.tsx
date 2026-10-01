@@ -11,7 +11,7 @@ const TOOLS = [
 ];
 
 /** The navy bar with the red rule, then the process rail: Board, Intake, Steps 1–5. */
-export default function Header({ busy, onSignOut }: { busy: string; onSignOut: () => void }) {
+export default function Header({ busy, onSignOut, user }: { busy: string; onSignOut: () => void; user: { email: string; name: string; picture?: string } | null }) {
   useEngine();
   const all = cases();
   const parked = all.filter((c) => PARKED.includes(c.stage)).length;
@@ -40,6 +40,14 @@ export default function Header({ busy, onSignOut }: { busy: string; onSignOut: (
                 {t.label}
               </NavLink>
             ))}
+            {user && (
+              <span className="flex items-center gap-2" title={user.email}>
+                {user.picture
+                  ? <img src={user.picture} alt="" referrerPolicy="no-referrer" className="h-6 w-6 rounded-full ring-1 ring-white/25" />
+                  : <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/15 text-[10px] font-bold">{user.name.slice(0, 1).toUpperCase()}</span>}
+                <span className="hidden text-[11px] font-medium opacity-80 md:inline">{user.name}</span>
+              </span>
+            )}
             <button onClick={onSignOut} className="text-[11px] font-semibold uppercase tracking-widest text-white opacity-60 hover:opacity-100">Sign out</button>
           </nav>
         </div>

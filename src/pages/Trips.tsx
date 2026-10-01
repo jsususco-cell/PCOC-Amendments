@@ -17,7 +17,7 @@ export default function Trips() {
   const towns = useMemo(() => Array.from(new Set(cases().map((c) => c.muni).filter(Boolean))).sort(), []);
   const [muni, setMuni] = useState(sp.get("town") ?? "");
   const [time, setTime] = useState(localNow());
-  const [who, setWho] = useState("");
+  const [who, setWho] = useState<string>(PC().user?.name ?? "");
   const [purpose, setPurpose] = useState(PUR[0]);
   const [outcome, setOutcome] = useState(OUT[0]);
   const [note, setNote] = useState("");
@@ -153,7 +153,7 @@ function RecentTrips() {
           <div className="flex flex-wrap gap-2">
             <Btn kind="outline" onClick={() => navigator.clipboard?.writeText(v["17"] || "")}><Copy className="h-4 w-4" />Copy the Canopy note</Btn>
             {v["18"] ? <Pill tone="ok">Pasted in Canopy {us(W.day(v["18"]))}{v["19"] ? ` by ${v["19"]}` : ""}</Pill>
-              : <Btn kind="outline" busy={busy === v.rid} onClick={() => run(v.rid, () => PC().markPasted(v.rid, ""), "Marked as pasted in Canopy.")}>I pasted it in Canopy</Btn>}
+              : <Btn kind="outline" busy={busy === v.rid} onClick={() => run(v.rid, () => PC().markPasted(v.rid, PC().user?.name ?? ""), "Marked as pasted in Canopy.")}>I pasted it in Canopy</Btn>}
           </div>
         </div>
       ))}

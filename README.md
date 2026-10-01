@@ -31,7 +31,7 @@ browser ── React UI (src/) ──► public/engine.js       logic lifted ver
             ▼
 Vercel ── api/qb.ts   allowlisted Quickbase XML-API proxy (adds the server's user token)
           api/up.ts   file relay for /up/… attachments
-          api/session.ts   password sign-in (HMAC cookie, 12 h)
+          api/session.ts   Google Workspace sign-in (+ team password fallback)
             ▼
 Quickbase, Construction Management_V2 (buskqh26r)
 ```
@@ -77,7 +77,7 @@ npm run dev                    # http://localhost:8080, /api runs in-process
 ## Limits
 
 * Uploads go through a serverless function, which caps the request body at about 4.5 MB. Base64 adds a third, so keep files under about 3 MB. Larger files go in the case's Drive folder.
-* Sign-in is one shared password, as in the Permitting Helper. Quickbase records the token's owner as the author of every change.
+* Sign-in is Google Workspace (byrdsonservices.com only), the same flow as the Permitting Helper, with the team password as a fallback. Quickbase still records the token's owner as the author of every change. The app fills the signed-in name into "Who went" and "Paid by".
 
 ## Regenerating the engine from page 177
 

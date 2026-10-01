@@ -3,7 +3,7 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster, toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import Header from "@/components/Header";
-import Login from "@/pages/Login";
+import Login, { type SessionInfo } from "@/pages/Login";
 import Board from "@/pages/Board";
 import Intake from "@/pages/Intake";
 import Prepare from "@/pages/Prepare";
@@ -24,13 +24,20 @@ export default function App() {
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState("");
   const [err, setErr] = useState("");
+  const [info, setInfo] = useState<SessionInfo | null>(null);
 
-  useEffect(() => {
+  const check = useCallback(() => {
     fetch("/api/session", { credentials: "same-origin" })
       .then((r) => r.json())
-      .then((j) => setAuth(!j.configured ? "unconfigured" : j.authed ? "in" : "out"))
+      .then((j: SessionInfo) => {
+        setInfo(j);
+        PC().user = j.user;
+        setAuth(!j.configured ? "unconfigured" : j.authed ? "in" : "out");
+        if (j.authed && /[?&]auth=/.test(location.search)) history.replaceState(null, "", location.pathname);
+      })
       .catch(() => setAuth("out"));
   }, []);
+  useEffect(() => { check(); }, [check]);
 
   useEffect(() => {
     const offs = [
@@ -56,12 +63,12 @@ export default function App() {
   }, []);
 
   if (auth === "checking") return <Splash text="Opening…" />;
-  if (auth === "unconfigured") return <Splash text="This deployment is not set up yet: APP_PASSWORD and QB_USER_TOKEN must be set in Vercel." />;
-  if (auth === "out") return <><Login onIn={() => setAuth("in")} /><Toaster richColors position="bottom-right" /></>;
+  if (auth === "unconfigured") return <Splash text="This deployment is not set up yet: QB_USER_TOKEN and a way to sign in (Google or APP_PASSWORD) must be set in Vercel." />;
+  if (auth === "out") return <><Login info={info} onIn={check} /><Toaster richColors position="bottom-right" /></>;
 
   return (
     <BrowserRouter>
-      <Header busy={busy} onSignOut={signOut} />
+      <Header busy={busy} onSignOut={signOut} user={info?.user ?? null} />
       <main className="mx-auto flex max-w-[1216px] flex-col gap-5 px-4 pb-12 pt-7 sm:px-8">
         {err && <div className="rounded-xl border border-[#f2c4bd] bg-bad-bg px-4 py-3 text-[13px] text-bad-ink"><b>Could not load everything.</b> {err}</div>}
         {!loaded ? (

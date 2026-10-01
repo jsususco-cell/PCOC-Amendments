@@ -88,7 +88,7 @@ export default function Payments() {
 
 function PayPanel({ r, onClose }: { r: Row; onClose: () => void }) {
   const { busy, run } = useAction();
-  const [v, setV] = useState({ arb: r.arb || "", pdate: r.pdate || "", pm: r.pm || "", card: r.card || "", pref: r.pref || "", pby: r.pby || "", pip: !!r.pip, pwho: r.pwho || "", carb: r.carb ? String(r.carb) : "", cpat: r.cpat ? String(r.cpat) : "", notes: r.notes || "" });
+  const [v, setV] = useState({ arb: r.arb || "", pdate: r.pdate || "", pm: r.pm || "", card: r.card || "", pref: r.pref || "", pby: r.pby || PC().user?.name || "", pip: !!r.pip, pwho: r.pwho || "", carb: r.carb ? String(r.carb) : "", cpat: r.cpat ? String(r.cpat) : "", notes: r.notes || "" });
   const [rcpt, setRcpt] = useState<File | null>(null);
   const set = (k: keyof typeof v) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setV((x) => ({ ...x, [k]: e.target.type === "checkbox" ? (e.target as HTMLInputElement).checked : e.target.value }));
