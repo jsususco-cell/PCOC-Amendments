@@ -9,6 +9,9 @@
     },
     "api/up.ts": {
       "maxDuration": 60
+    },
+    "api/feed.ts": {
+      "maxDuration": 300
     }
   },
   "rewrites": [
@@ -27,6 +30,12 @@
     {
       "source": "/((?!api/).*)",
       "destination": "/index.html"
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/feed",
+      "schedule": "0 10 * * *"
     }
   ]
 }

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { RefreshCw, Search } from "lucide-react";
 import { Btn, EDGE, Empty, Kpi, PageTitle, Pill } from "@/components/ui";
+import CanopyFlags from "@/components/CanopyFlags";
 import { PARKED, PC, STEPS, cases, daysOf, inStep, limitOf, missing, msOf, overdue, pathOf, stageOf, useEngine } from "@/lib/engine";
 
 export default function Board() {
@@ -99,6 +100,8 @@ export default function Board() {
           </table>
         )}
       </section>
+
+      <CanopyFlags />
 
       <div className="flex flex-wrap items-center gap-3 text-xs text-mute">
         <Btn kind="outline" onClick={() => PC().upkeep()}><RefreshCw className="h-4 w-4" />Sync now</Btn>

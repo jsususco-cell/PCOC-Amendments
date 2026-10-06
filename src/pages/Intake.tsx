@@ -34,7 +34,7 @@ export default function Intake() {
   return (
     <>
       <PageTitle title="Intake" who="Priscilla" ends="each case is decided: needs an amendment, parked, or not required." />
-      <div className="next">A case needs an amendment when a scope change changed the <b>construction</b> cost (temporary relocation does not count). New scope changes come from Canopy by themselves: you only decide. Rebuilt houses wait for Structure, then show in <b>1 · Prepare</b> as a heads-up; the work starts at Substantial/Finishes.</div>
+      <div className="next">A case needs an amendment when a scope change changed the <b>construction</b> cost (temporary relocation does not count). New cases come in every morning from Canopy's scope changes (approved after the permit); you only decide. Rebuilt houses wait for Structure, then show in <b>1 · Prepare</b> as a heads-up; the work starts at Substantial/Finishes.</div>
 
       <div role="tablist" aria-label="Intake lists" className="flex flex-wrap gap-1.5">
         {LISTS.map((l) => (
