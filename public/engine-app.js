@@ -281,17 +281,46 @@ PC.mail=function(rid,key){
   if(!fn) return Promise.reject(new Error('Unknown email.'));
   return fn(c).then(function(st){ return mailLoad().then(function(){ emit('change'); return st; }); });
 };
-/* Build the narrative (and the Cost Estimate when the scope file matches
-   Canopy), then hand back the case as Quickbase now has it. Page 177's own
-   toast is skipped so the app can say exactly what happened. */
+/* The PCOC template narrative (page 177's builder, with the fixes above).
+   Used only when the Permitting Helper has no narrative for the case to revise. */
+function ownNarrative(c,rows){
+  return jobDates(c).then(function(J){
+    applyJobFacts(c,J);
+    var B=narrativeBlocks(c,J,rows?changes(rows):[]);
+    return Promise.all([narrativePdf(c,B),blobB64(narrativeWord(c,B))]).then(function(o){
+      return xml2(CT,'API_EditRecord','<rid>'+c.rid+'</rid><field fid="12" filename="'+esc(c.cs+' - Narrative - REVISED.pdf')+'">'+fileB64(o[0])+'</field><field fid="54" filename="'+esc(c.cs+' - Narrative - REVISED.doc')+'">'+o[1]+'</field>');
+    });
+  });
+}
+
+/* Make the papers. The Cost Estimate (and the Narrative, when the Permitting
+   Helper has one for the case) are built by the Permitting Helper's own
+   generators, through /api/revise, and say what they revise. Hands back the
+   case as Quickbase now has it, plus what was done. */
 PC.buildDocs=function(rid){
   var c=caseByRid(rid); if(!c) return Promise.reject(new Error('Case not found.'));
-  var before=c.narr;
-  return buildDocs(c,null,true).then(function(){ return gLoad(); }).then(function(){
-    var n=caseByRid(rid)||c;
-    if(!n.narr && !before) throw new Error('The papers could not be made. Try again, or tell the tech team.');
-    return n;
-  });
+  var r0=rowsOf(c)[0]; if(!r0) return Promise.reject(new Error('This case has no amendment rows.'));
+  if(!c.scx){
+    return ownNarrative(c,null).then(function(){ return gLoad(); })
+      .then(function(){ return {c:caseByRid(rid)||c, result:{narrative:'pcoc', narrativeReason:'No scope file yet, so only the PCOC Narrative was made.'}}; });
+  }
+  var name=fname(c.scx), sheet=/\.xlsx?$/i.test(name), parsed=null, result=null;
+  return qfetch('/up/'+CT+'/a/r'+c.rid+'/e53/v0')
+    .then(function(x){ if(!x.ok) throw new Error('Could not open the saved scope file.'); return x.arrayBuffer(); })
+    .then(function(buf){ return parseScopeFile(buf).then(function(rows){ parsed=rows; return buf; }); })
+    .then(function(buf){
+      var changesList=rowsOf(c).filter(function(r){ return /^\d+$/.test(String(r.sc||'')); })
+        .sort(function(a,b){ return String(a.appr).localeCompare(String(b.appr)); })
+        .map(function(r){ return 'Program scope change '+r.sc+(r.typ?' ('+r.typ+')':'')+(r.appr?', approved '+longDate(r.appr):'')+'.'; });
+      var body={ rid:Number(c.rid), atPermit:r0.atpermit||0, now:r0.connow||0, permitDate:r0.permit||'', changes:changesList };
+      if(sheet) body.scope={ fileName:name, base64:fileB64(buf) };
+      else body.rows=estLines(parsed).map(function(r,i){ return {row:i+1,itemNo:Number(r.n)||null,groupDesc:r.grp||'',desc:r.desc||'',qty:Number(r.qty)||0,unitCost:Number(r.uc)||0,salesTax:0,rcv:Number(r.rcv)||0}; });
+      return fetch('/api/revise',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    })
+    .then(function(x){ return x.json().then(function(j){ if(!x.ok) throw new Error(j.error||('The papers could not be made ('+x.status+').')); return j; }); })
+    .then(function(j){ result=j; return j.narrative==='skipped' ? ownNarrative(c,parsed).then(function(){ result.narrative='pcoc'; }) : null; })
+    .then(function(){ return gLoad(); })
+    .then(function(){ return {c:caseByRid(rid)||c, result:result}; });
 };
 
 /* One printable PDF for a whole trip: each case's municipality pack, in order.

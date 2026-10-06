@@ -12,6 +12,9 @@
     },
     "api/feed.ts": {
       "maxDuration": 300
+    },
+    "api/revise.ts": {
+      "maxDuration": 120
     }
   },
   "rewrites": [

@@ -49,6 +49,16 @@ function PrepareCase({ c }: { c: Case }) {
   const match = chk.startsWith("MATCH");
   const mism = chk.startsWith("MISMATCH");
   const sf: Record<string, string>[] = W.sfOf(c) ?? [];
+  /* What the build wrote into the check: which generator, and what each revises. */
+  const between = (from: string, until: string) => {
+    const i = chk.indexOf(from);
+    if (i < 0) return "";
+    const j = until ? chk.indexOf(until, i + from.length) : -1;
+    return chk.slice(i, j < 0 ? undefined : j).trim();
+  };
+  const estBy = between("Cost Estimate built by the Permitting Helper", " Narrative");
+  const narBy = between("Narrative built by the Permitting Helper", "");
+  const helperNarr = !!narBy;
   const [txt, setTxt] = useState<Record<string, string>>(() => ({
     addr: c.addr || R[0]?.addr || "", exSf: c.exSf, lot: c.lot, model: c.model, newSf: c.newSf, aps: c.aps,
     chg: c.chg, oNarr: c.oNarr, oEst: c.oEst, note: c.note,
@@ -60,12 +70,14 @@ function PrepareCase({ c }: { c: Case }) {
   const [preview, setPreview] = useState(false);
 
   /* What the build did, from the check it wrote on the case. */
-  const built = (n: Case) => {
-    const k = n.estChk || "";
-    const detail = k.replace(/^(MATCH|MISMATCH) [0-9/]+: /, "");
-    if (k.startsWith("MATCH")) return `Cost Estimate and Narrative made. The scope file matches Canopy.`;
-    if (k.startsWith("MISMATCH")) { toast.warning(`Narrative made. The Cost Estimate was NOT made, because the scope file does not match Canopy: ${detail}`, { duration: 15000 }); return ""; }
-    return "Narrative made. Upload the scope file to make the Cost Estimate.";
+  /* What the build did: which generator made each paper, and what it revises. */
+  type Built = { c: Case; result: { match?: boolean; total?: number; now?: number; narrative?: string; narrativeReason?: string | null } };
+  const built = ({ result: r }: Built) => {
+    const narr = r.narrative === "helper" ? "Narrative made by the Permitting Helper (revised)." : `PCOC Narrative made${r.narrativeReason ? ` (${r.narrativeReason})` : ""}.`;
+    if (r.match === undefined) return narr;
+    if (r.match) return `Cost Estimate made by the Permitting Helper (revised); the scope file matches Canopy. ${narr}`;
+    toast.warning(`The Cost Estimate was NOT saved: the scope file's total ${money(r.total ?? 0)} does not match Canopy's ${money(r.now ?? 0)}. ${narr}`, { duration: 15000 });
+    return "";
   };
   const build = () => run("build", () => PC().buildDocs(c.rid), built);
   /* Upload starts the build: one step instead of two. */
@@ -114,17 +126,19 @@ function PrepareCase({ c }: { c: Case }) {
       </div>
 
       <DocRow state={h.estOk ? "ok" : h.est && !mism ? "wait" : "no"} name="Cost Estimate"
-        detail={r2 ? `Estimado de Costos Revisado${R.find((r) => r.estOn)?.estOn ? " · made " + us(R.find((r) => r.estOn)!.estOn) : ""}` : "Made by the green button from a scope file that matches Canopy."}
+        detail={<>{r2 ? `Estimado de Costos Revisado${R.find((r) => r.estOn)?.estOn ? " · made " + us(R.find((r) => r.estOn)!.estOn) : ""}` : "Made by the Permitting Helper from a scope file that matches Canopy."}
+          {estBy && <span className="block">{estBy}{c.oEst && <> <a href={c.oEst} target="_blank" rel="noreferrer">Open the original</a></>}</span>}</>}
         pill={h.estOk ? <Pill tone="ok">Checked {us(c.estOk)}</Pill> : h.est ? (mism ? <Pill tone="bad">Scope file does not match</Pill> : <Pill tone="wait">Needs checking</Pill>) : <Pill tone="bad">Not made yet</Pill>}>
         {r2 && <Btn kind="outline" onClick={() => r2.l2 ? window.open(r2.l2, "_blank") : view(rowFile(r2, 47), `Cost Estimate - ${c.cs}`)}><Eye className="h-4 w-4" />View</Btn>}
         {h.est && !h.estOk && <Btn busy={busy === "save"} onClick={() => save({ dates: { estOk: todayIso() } }, "Estimate marked checked.")}>Mark checked</Btn>}
       </DocRow>
 
       <DocRow state={h.narrOk ? "ok" : h.narr ? "wait" : "no"} name="Project Narrative"
-        detail={c.narr ? `${c.narr}${c.word ? " · Word copy for changes" : ""}` : "Made by the green button."}
+        detail={<>{c.narr ? `${c.narr}${c.word && !helperNarr ? " · Word copy for changes" : ""}` : "Made by the green button."}
+          {c.narr && <span className="block">{helperNarr ? narBy : "PCOC template: the Permitting Helper has no finished narrative for this case to revise."}{helperNarr && c.oNarr && <> <a href={c.oNarr} target="_blank" rel="noreferrer">Open the original</a></>}</span>}</>}
         pill={h.narrOk ? <Pill tone="ok">Checked {us(c.narrOk)}</Pill> : h.narr ? <Pill tone="wait">Needs checking</Pill> : <Pill tone="bad">Not made yet</Pill>}>
         {c.narr && <Btn kind="outline" onClick={() => view(caseFile(c, 12), `Project Narrative - ${c.cs}`)}><Eye className="h-4 w-4" />View</Btn>}
-        {c.word && <a className="btn border-[#cfd6e2] bg-white text-navy no-underline hover:border-navy" href={downloadUrl(caseFile(c, 54))} download><FileText className="h-4 w-4" />Word</a>}
+        {c.word && !helperNarr && <a className="btn border-[#cfd6e2] bg-white text-navy no-underline hover:border-navy" href={downloadUrl(caseFile(c, 54))} download><FileText className="h-4 w-4" />Word</a>}
         {h.narr && !h.narrOk && <Btn busy={busy === "save"} onClick={() => save({ dates: { narrOk: todayIso() } }, "Narrative marked checked.")}>Mark checked</Btn>}
       </DocRow>
 
