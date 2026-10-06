@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Loader2 } from "lucide-react";
-import { Empty, Pill } from "./ui";
-import { cases, money, pathOf } from "@/lib/engine";
+import { Loader2, RefreshCw } from "lucide-react";
+import { Btn, Confirm, Empty, Pill, useAction } from "./ui";
+import { PC, cases, money, pathOf } from "@/lib/engine";
 
 interface Review { cs: string; rowNow: number; canopyNow: number; difference: number; newer: string[] }
 interface Plan { at: string; rows: { cs: string }[]; cases: string[]; review: Review[]; noPermitDate: string[] }
@@ -15,11 +15,27 @@ interface Plan { at: string; rows: { cs: string }[]; cases: string[]; review: Re
 export default function CanopyFlags() {
   const [plan, setPlan] = useState<Plan | null>(null);
   const [err, setErr] = useState("");
-  useEffect(() => {
-    fetch("/api/feed", { credentials: "same-origin" })
+  const [ask, setAsk] = useState(false);
+  const { busy, run } = useAction();
+  const load = useCallback(() => {
+    setErr("");
+    return fetch("/api/feed", { credentials: "same-origin" })
       .then(async (r) => { const j = await r.json(); if (!r.ok) throw new Error(j.error || `Error ${r.status}`); return j as Plan; })
       .then(setPlan).catch((e: Error) => setErr(e.message));
   }, []);
+  useEffect(() => { load(); }, [load]);
+
+  /* Same as the 6:00 am run: adds new cases only, never changes one already in PCOC. */
+  const runNow = () => run("feed", async () => {
+    const r = await fetch("/api/feed", { method: "POST", credentials: "same-origin" });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || `The feed failed (${r.status}).`);
+    await PC().reload();
+    await load();
+    return j as { casesAdded: number; rowsAdded: number };
+  }, (j) => j.casesAdded || j.rowsAdded
+    ? `Feed done: ${j.casesAdded} new case${j.casesAdded === 1 ? "" : "s"}, ${j.rowsAdded} row${j.rowsAdded === 1 ? "" : "s"} added. They are in Intake.`
+    : "Feed done: nothing new to add.");
 
   return (
     <section className="card overflow-x-auto">
@@ -57,8 +73,16 @@ export default function CanopyFlags() {
           New cases come in every morning from Canopy's scope changes.
           {plan.cases.length ? ` ${plan.cases.length} new case${plan.cases.length === 1 ? " is" : "s are"} waiting for the next run.` : " Nothing new is waiting."}
           {plan.noPermitDate.length ? ` ${plan.noPermitDate.length} case${plan.noPermitDate.length === 1 ? " has" : "s have"} changes but no permit date on the job yet, so they are not added.` : ""}
+          {plan.cases.length > 0 && (
+            <div className="mt-2">
+              <Btn kind="outline" busy={busy === "feed"} onClick={() => setAsk(true)}><RefreshCw className="h-4 w-4" />Run the feed now</Btn>
+            </div>
+          )}
         </div>
       )}
+      <Confirm open={ask} title="Run the feed now?" action="Add the new cases"
+        body={plan && <>This adds <b>{plan.cases.length}</b> new case{plan.cases.length === 1 ? "" : "s"} ({plan.rows.length} row{plan.rows.length === 1 ? "" : "s"}) from Canopy to PCOC, the same as the 6:00 am run. Cases already in PCOC are not changed.</>}
+        onCancel={() => setAsk(false)} onOk={() => { setAsk(false); runNow(); }} />
     </section>
   );
 }
