@@ -421,6 +421,41 @@ PC.handoff=function(rid,to){
     .then(function(st){ emit('change'); return st; });
 };
 
+/* ===== Document fixes found on the PR-BR-50443 dry run (2026-10-07) ===== */
+
+/* Cost Estimate: leave out lines worth nothing, as the Permitting Helper does
+   (office request, 2 Oct 2026). The total is unchanged. */
+function estLines(rows){ return window.__p177.estLines(rows).filter(function(r){ return !!r.rcv; }); }
+
+/* Narrative: page 177's text, corrected where it reads wrong. */
+function narrativeBlocks(c,J,ch){
+  var B=window.__p177.narrativeBlocks(c,J,ch), r0=rowsOf(c)[0]||{};
+  B.forEach(function(b){
+    /* "structure with located on a 779-square-meter lot" when only the lot is known */
+    b.s=String(b.s).replace(' with located on a ',' located on a ').replace(', located on a ',' and located on a ');
+  });
+  /* 1.3 needs at least one change listed. The "Xactimate Scope Import" export
+     does not mark replaced lines, so list the case's approved scope changes. */
+  var h=B.findIndex(function(b){ return b.t==='h'&&/^1\.3 /.test(b.s); }), next=B.findIndex(function(b,i){ return i>h&&b.t==='h'; });
+  if(h>=0){
+    var end=next<0?B.length:next, bullets=B.slice(h+1,end).filter(function(b){ return b.t==='b'; }).length;
+    if(!bullets){
+      var list=rowsOf(c).filter(function(r){ return /^\d+$/.test(String(r.sc||'')); }).sort(function(a,b){ return String(a.appr).localeCompare(String(b.appr)); })
+        .map(function(r){ return {t:'b',s:'Program scope change '+r.sc+(r.typ?' ('+r.typ+')':'')+(r.appr?', approved '+longDate(r.appr):'')+'.'}; });
+      if(!list.length) list=[{t:'b',s:'The approved scope changes are itemized in the revised Cost Estimate.'}];
+      B.splice.apply(B,[h+2,0].concat(list));
+    }
+    /* "increased … an increase of $-9,932.92" when the cost went down */
+    var amt=Number(r0.amt)||((Number(r0.connow)||0)-(Number(r0.atpermit)||0));
+    B.forEach(function(b){
+      if(b.t==='p'&&/^As a result of these approved changes/.test(b.s)){
+        b.s='As a result of these approved changes, the construction cost '+(amt<0?'decreased':'increased')+' from '+money(r0.atpermit)+' at the time of the permit to '+money(r0.connow)+', '+(amt<0?'a decrease of ':'an increase of ')+money(Math.abs(amt))+'.';
+      }
+    });
+  }
+  return B;
+}
+
 /* Read the scope file on a case (Xactimate PDF, Canopy export, or the
    "Xactimate Scope Import" .xls) without saving anything: the line items,
    what the estimate leaves out, and the construction total against Canopy. */

@@ -11,6 +11,8 @@
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&display=swap" />
     <!-- The PCOC logic lifted from Quickbase code page 177, then the app layer over it. Classic scripts on purpose. -->
     <script src="/engine.js"></script>
+    <!-- Keep page 177's originals so engine-app.js can wrap them (its declarations replace these globals). -->
+    <script>window.__p177 = { narrativeBlocks: narrativeBlocks, estLines: estLines };</script>
     <script src="/engine-app.js"></script>
   </head>
   <body>
