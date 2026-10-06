@@ -281,9 +281,17 @@ PC.mail=function(rid,key){
   if(!fn) return Promise.reject(new Error('Unknown email.'));
   return fn(c).then(function(st){ return mailLoad().then(function(){ emit('change'); return st; }); });
 };
+/* Build the narrative (and the Cost Estimate when the scope file matches
+   Canopy), then hand back the case as Quickbase now has it. Page 177's own
+   toast is skipped so the app can say exactly what happened. */
 PC.buildDocs=function(rid){
   var c=caseByRid(rid); if(!c) return Promise.reject(new Error('Case not found.'));
-  return buildDocs(c,null,false);
+  var before=c.narr;
+  return buildDocs(c,null,true).then(function(){ return gLoad(); }).then(function(){
+    var n=caseByRid(rid)||c;
+    if(!n.narr && !before) throw new Error('The papers could not be made. Try again, or tell the tech team.');
+    return n;
+  });
 };
 
 /* One printable PDF for a whole trip: each case's municipality pack, in order.
@@ -411,6 +419,27 @@ PC.handoff=function(rid,to){
     +'\nThe papers are in the case folder in Drive (05 Permits / Amendment).\n\nThank you,\nByrdson Services PCOC team';
   return qmail(c,HANDOFF,to,'','PCOC listo, puede empezar el permiso de uso - '+c.cs,body,[r1?qurl(TID,r1.rid,46):null].filter(Boolean))
     .then(function(st){ emit('change'); return st; });
+};
+
+/* Read the scope file on a case (Xactimate PDF, Canopy export, or the
+   "Xactimate Scope Import" .xls) without saving anything: the line items,
+   what the estimate leaves out, and the construction total against Canopy. */
+PC.readScope=function(rid){
+  var c=caseByRid(rid); if(!c) return Promise.reject(new Error('Case not found.'));
+  if(!c.scx) return Promise.reject(new Error('There is no scope file on this case yet.'));
+  var r0=rowsOf(c)[0]||{};
+  return qfetch('/up/'+CT+'/a/r'+c.rid+'/e53/v0')
+    .then(function(x){ if(!x.ok) throw new Error('The scope file could not be opened ('+x.status+').'); return x.arrayBuffer(); })
+    .then(function(buf){ return parseScopeFile(buf); })
+    .then(function(rows){
+      var kept=estLines(rows), keptSet=new Set(kept);
+      var total=estTotal(rows), now=r0.connow||0, atp=r0.atpermit||0;
+      return {
+        file:c.scx, rows:rows.map(function(r){ return {grp:r.grp,desc:r.desc,qty:r.qty,unit:r.unit,uc:r.uc,rcv:r.rcv,rev:!!r.rev,kept:keptSet.has(r),why:keptSet.has(r)?'':(isTax(r)?'Taxes':isSoft(r)?'Soft costs':r.rev?'Revised (old line)':'')}; }),
+        total:total, canopyNow:now, atPermit:atp, diff:Math.round((total-now)*100)/100,
+        cls:sfClass(total,r0), changes:changes(rows).length
+      };
+    });
 };
 
 PC.view=function(u,title){ return viewFile(u,title); };

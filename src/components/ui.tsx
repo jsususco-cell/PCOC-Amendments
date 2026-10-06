@@ -40,7 +40,8 @@ export function useAction() {
     setBusy(key);
     try {
       const v = await fn();
-      if (ok) toast.success(typeof ok === "function" ? ok(v) : ok);
+      const msg = typeof ok === "function" ? ok(v) : ok;
+      if (msg) toast.success(msg);
       return v;
     } catch (e) {
       toast.error(e instanceof Error ? e.message : String(e));

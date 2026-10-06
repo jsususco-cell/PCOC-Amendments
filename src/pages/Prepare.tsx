@@ -1,8 +1,10 @@
 import { useState } from "react";
+import { toast } from "sonner";
 import { Eye, FileText, Mail, Send, Sparkles } from "lucide-react";
 import { ActionBar, Btn, DateField, DocRow, EDGE, FileBtn, HeldBanner, Kpi, NextBox, PageTitle, Pill, TextField, useAction } from "@/components/ui";
 import CaseLookup from "@/components/CaseLookup";
 import CaseHead from "@/components/CaseHead";
+import ScopePreview from "@/components/ScopePreview";
 import MailNote, { mailToast } from "@/components/MailNote";
 import { type Case, PC, W, caseFile, daysOf, downloadUrl, have, inStep, limitOf, mailLive, missing, money, msOf, rowFile, rowsOf, todayIso, us, useEngine, view } from "@/lib/engine";
 import { useSelectedCase } from "@/lib/useCase";
@@ -54,21 +56,38 @@ function PrepareCase({ c }: { c: Case }) {
   const set = (k: string) => (v: string) => setTxt((t) => ({ ...t, [k]: v }));
   const need = [!h.drw && "Harold's drawings", !h.narr && "the Narrative", !(h.est && (!chk || match)) && "a Cost Estimate that matches Canopy"].filter(Boolean) as string[];
   const m = missing(c);
+  const [preview, setPreview] = useState(false);
+
+  /* What the build did, from the check it wrote on the case. */
+  const built = (n: Case) => {
+    const k = n.estChk || "";
+    const detail = k.replace(/^(MATCH|MISMATCH) [0-9/]+: /, "");
+    if (k.startsWith("MATCH")) return `Cost Estimate and Narrative made. The scope file matches Canopy.`;
+    if (k.startsWith("MISMATCH")) { toast.warning(`Narrative made. The Cost Estimate was NOT made, because the scope file does not match Canopy: ${detail}`, { duration: 15000 }); return ""; }
+    return "Narrative made. Upload the scope file to make the Cost Estimate.";
+  };
+  const build = () => run("build", () => PC().buildDocs(c.rid), built);
+  /* Upload starts the build: one step instead of two. */
+  const uploadScope = (f: File) => run("build", async () => {
+    await PC().saveCase(c.rid, { files: { scx: f } });
+    return PC().buildDocs(c.rid);
+  }, built);
 
   const save = (o: object, ok = "Saved.") => run("save", () => PC().saveCase(c.rid, o), (r: { stage: string; from: string }) => r?.stage && r.from && r.stage !== r.from ? `${ok} ${c.cs} moved to ${r.stage}.` : ok);
   const mail = (key: string) => run("m" + key, () => PC().mail(c.rid, key), mailToast);
 
   return (
     <section className="card">
+      {preview && <ScopePreview c={c} onClose={() => setPreview(false)} />}
       <CaseHead c={c} right={<p className="mt-1.5 text-sm"><b>{3 - need.length}</b> <span className="text-xs text-mute">of 3 papers ready</span></p>} />
       {m[0] && <div className="mx-5 mb-3.5"><NextBox>{m[0]}</NextBox></div>}
       {c.issues && <div className="mx-5 mb-3.5 rounded-lg border border-[#fed7aa] bg-[#fff7ed] px-3 py-2 text-xs text-[#9a3412]">Heads up, the OLD narrative for this case had mistakes: {c.issues} The new one fixes this.</div>}
 
       <DocRow state={match ? "ok" : mism ? "no" : c.scx ? "wait" : "no"} name="Scope file (Xactimate PDF or Canopy Excel)"
         detail={c.scx ? `${c.scx}${chk ? " · " + chk.replace(/^(MATCH|MISMATCH) /, "") : ""}` : "Looked for in Drive every night. Upload it here if you have it."}
-        pill={match ? <Pill tone="ok">Matches Canopy</Pill> : mism ? <Pill tone="bad">Older than Canopy</Pill> : c.scx ? <Pill tone="wait">Not checked yet</Pill> : <Pill tone="bad">Not here yet</Pill>}>
-        {c.scx && <Btn kind="outline" onClick={() => view(caseFile(c, 53), `Scope file - ${c.cs}`)}><Eye className="h-4 w-4" />View</Btn>}
-        <FileBtn label={c.scx ? "Replace" : "Upload"} accept=".pdf,.xls,.xlsx" busy={busy === "save"} onFile={(f) => save({ files: { scx: f } }, "Scope file saved. Now press Make the papers.")} />
+        pill={match ? <Pill tone="ok">Matches Canopy</Pill> : mism ? <Pill tone="bad">Does not match Canopy</Pill> : c.scx ? <Pill tone="wait">Not checked yet</Pill> : <Pill tone="bad">Not here yet</Pill>}>
+        {c.scx && <Btn kind="outline" onClick={() => setPreview(true)}><Eye className="h-4 w-4" />View</Btn>}
+        <FileBtn label={c.scx ? "Replace" : "Upload"} accept=".pdf,.xls,.xlsx" busy={busy === "build"} onFile={uploadScope} />
       </DocRow>
       {sf.length > 0 && (
         <details className="border-t border-[#eef1f6] px-5 py-2.5 text-xs">
@@ -85,13 +104,13 @@ function PrepareCase({ c }: { c: Case }) {
         </details>
       )}
       <div className="flex flex-wrap items-center gap-3 border-t border-[#eef1f6] px-5 py-3.5">
-        <Btn kind="go" busy={busy === "build"} onClick={() => run("build", () => PC().buildDocs(c.rid))}><Sparkles className="h-4 w-4" />Make the Cost Estimate and Narrative</Btn>
-        <span className="text-xs text-mute">{c.scx ? "Builds both from the scope file and the house details below." : "No scope file yet: only the Narrative can be made."}</span>
+        <Btn kind="go" busy={busy === "build"} onClick={build}><Sparkles className="h-4 w-4" />Make the Cost Estimate and Narrative</Btn>
+        <span className="text-xs text-mute">{busy === "build" ? "Reading the scope file and making the papers…" : c.scx ? "Uploading a scope file does this by itself. Press again after fixing the house details below." : "No scope file yet: only the Narrative can be made."}</span>
       </div>
 
       <DocRow state={h.estOk ? "ok" : h.est && !mism ? "wait" : "no"} name="Cost Estimate"
         detail={r2 ? `Estimado de Costos Revisado${R.find((r) => r.estOn)?.estOn ? " · made " + us(R.find((r) => r.estOn)!.estOn) : ""}` : "Made by the green button from a scope file that matches Canopy."}
-        pill={h.estOk ? <Pill tone="ok">Checked {us(c.estOk)}</Pill> : h.est ? (mism ? <Pill tone="bad">Older than Canopy</Pill> : <Pill tone="wait">Needs checking</Pill>) : <Pill tone="bad">Not made yet</Pill>}>
+        pill={h.estOk ? <Pill tone="ok">Checked {us(c.estOk)}</Pill> : h.est ? (mism ? <Pill tone="bad">Scope file does not match</Pill> : <Pill tone="wait">Needs checking</Pill>) : <Pill tone="bad">Not made yet</Pill>}>
         {r2 && <Btn kind="outline" onClick={() => r2.l2 ? window.open(r2.l2, "_blank") : view(rowFile(r2, 47), `Cost Estimate - ${c.cs}`)}><Eye className="h-4 w-4" />View</Btn>}
         {h.est && !h.estOk && <Btn busy={busy === "save"} onClick={() => save({ dates: { estOk: todayIso() } }, "Estimate marked checked.")}>Mark checked</Btn>}
       </DocRow>
