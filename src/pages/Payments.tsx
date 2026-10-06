@@ -88,8 +88,18 @@ export default function Payments() {
 
 function PayPanel({ r, onClose }: { r: Row; onClose: () => void }) {
   const { busy, run } = useAction();
-  const [v, setV] = useState({ arb: r.arb || "", pdate: r.pdate || "", pm: r.pm || "", card: r.card || "", pref: r.pref || "", pby: r.pby || PC().user?.name || "", pip: !!r.pip, pwho: r.pwho || "", carb: r.carb ? String(r.carb) : "", cpat: r.cpat ? String(r.cpat) : "", notes: r.notes || "" });
+  const [start] = useState(() => ({ arb: r.arb || "", pdate: r.pdate || "", pm: r.pm || "", card: r.card || "", pref: r.pref || "", pby: r.pby || "", pip: !!r.pip, pwho: r.pwho || "", carb: r.carb ? String(r.carb) : "", cpat: r.cpat ? String(r.cpat) : "", notes: r.notes || "" }));
+  const [v, setV] = useState(start);
   const [rcpt, setRcpt] = useState<File | null>(null);
+  /* Only what was changed goes to Quickbase. "Paid by" is filled with the
+     signed-in name only once a payment is being recorded. */
+  const changed = () => {
+    const out: Record<string, string | boolean> = {};
+    (Object.keys(v) as (keyof typeof v)[]).forEach((k) => { if (v[k] !== start[k]) out[k] = v[k]; });
+    const paying = Number(v.arb) > 0 && !start.arb;
+    if (paying && !v.pby && PC().user?.name) out.pby = PC().user.name;
+    return out;
+  };
   const set = (k: keyof typeof v) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setV((x) => ({ ...x, [k]: e.target.type === "checkbox" ? (e.target as HTMLInputElement).checked : e.target.value }));
   const charged = (Number(v.carb) || 0) + (Number(v.cpat) || 0), due = (r.adue || 0) + (r.pdue || 0);
@@ -128,7 +138,7 @@ function PayPanel({ r, onClose }: { r: Row; onClose: () => void }) {
       <label className="label">Notes<input className="input" value={v.notes} onChange={set("notes")} /></label>
       {r.calc && <details className="text-xs"><summary className="cursor-pointer font-semibold text-navy">How this was worked out</summary><pre className="mt-1.5 whitespace-pre-wrap rounded-md border border-line bg-[#f8fafc] p-2 text-[11px]">{r.calc}</pre></details>}
       <div className="flex gap-2">
-        <Btn kind="go" busy={busy === "s"} onClick={() => run("s", () => PC().savePayment(r.rid, v, rcpt).then((sid: string | null) => { setRcpt(null); return sid; }),
+        <Btn kind="go" busy={busy === "s"} onClick={() => run("s", () => PC().savePayment(r.rid, changed(), rcpt).then((sid: string | null) => { setRcpt(null); return sid; }),
           (sid: string | null) => sid ? `Saved. Job cost posted as ${sid}.` : "Saved.")}>Save</Btn>
         {r.pdate && <span className="self-center text-xs text-mute">Paid {us(r.pdate)}</span>}
       </div>

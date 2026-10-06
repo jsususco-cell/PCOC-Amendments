@@ -96,7 +96,7 @@ PC.upkeep=function(){
 /* Save a case: dates (ISO), text fields, files. Port of page 177 saveCase(). */
 PC.saveCase=function(rid,o){
   var c=caseByRid(rid); if(!c) return Promise.reject(new Error('Case not found.'));
-  o=o||{}; var inner='<rid>'+c.rid+'</rid>', chg=0, files=[], npaFile=o.npa||null;
+  o=o||{}; var from=c.stage, inner='<rid>'+c.rid+'</rid>', chg=0, files=[], npaFile=o.npa||null;
   Object.keys(o.dates||{}).forEach(function(k){ var v=o.dates[k]||''; if(!CF[k]) return; if(v!==(c[k]||'')){ inner+='<field fid="'+CF[k]+'">'+gmdy(v)+'</field>'; c[k]=v; chg++; } });
   Object.keys(o.texts||{}).forEach(function(k){ var v=o.texts[k]==null?'':String(o.texts[k]); if(!TXT[k]) return; if(v!==(c[k]||'')){ inner+='<field fid="'+TXT[k]+'">'+esc(v)+'</field>'; c[k]=v; chg++; } });
   Object.keys(o.files||{}).forEach(function(k){ if(o.files[k]&&CF[k]) files.push({fid:CF[k],key:k,f:o.files[k]}); });
@@ -104,7 +104,7 @@ PC.saveCase=function(rid,o){
   if(files.some(function(x){return x.key==='sign';})&&!c.signOn){ c.signOn=gtoday(); inner+='<field fid="31">'+gmdy(c.signOn)+'</field>'; }
   if(files.some(function(x){return x.key==='drw';})&&!c.drwRec){ c.drwRec=gtoday(); inner+='<field fid="17">'+gmdy(c.drwRec)+'</field>'; }
   var ns=derive(c); if(ns!==c.stage){ inner+='<field fid="10">'+esc(ns)+'</field><field fid="11">'+gmdy(gtoday())+'</field>'; c.stage=ns; c.since=gtoday(); c.days='0'; chg++; }
-  if(!chg&&!files.length&&!npaFile) return Promise.resolve({changed:false,stage:c.stage});
+  if(!chg&&!files.length&&!npaFile) return Promise.resolve({changed:false,stage:c.stage,from:from});
   return Promise.all(files.map(function(x){ return b64of(x.f).then(function(b){ return {fid:x.fid,key:x.key,name:x.f.name,b:b}; }); }))
     .then(function(fs){ fs.forEach(function(x){ inner+='<field fid="'+x.fid+'" filename="'+esc(x.name)+'">'+x.b+'</field>'; c[x.key]=x.name; }); return xml2(CT,'API_EditRecord',inner); })
     .then(function(){
@@ -113,7 +113,7 @@ PC.saveCase=function(rid,o){
         return xml('API_EditRecord','<rid>'+r.rid+'</rid><field fid="46" filename="'+esc(npaFile.name)+'">'+b+'</field><field fid="45">'+gmdy(c.npaOn)+'</field>'); })); });
     })
     .then(function(){ return gLoad(); })
-    .then(function(){ return {changed:true,stage:c.stage}; });
+    .then(function(){ return {changed:true,stage:c.stage,from:from}; });
 };
 
 /* Case-level papers that live on the money rows (one per scope change):
@@ -165,8 +165,11 @@ PC.getFinishedRule=function(){
 PC.savePayment=function(rowRid,v,receipt){
   var r=S.rows.filter(function(x){ return String(x.rid)===String(rowRid); })[0]; if(!r) return Promise.reject(new Error('Row not found.'));
   v=v||{};
-  if(Number(v.arb)>0&&!v.pm) return Promise.reject(new Error('Say how it was paid.'));
-  if(v.pm==='Credit Card'&&!v.card) return Promise.reject(new Error('Which card paid it?'));
+  /* v holds only what changed; check against the record as it will be */
+  var arb=('arb' in v)?v.arb:r.arb, pm=('pm' in v)?v.pm:r.pm, card=('card' in v)?v.card:r.card;
+  if(!Object.keys(v).length&&!receipt) return Promise.resolve(null);
+  if(Number(arb)>0&&!pm) return Promise.reject(new Error('Say how it was paid.'));
+  if(pm==='Credit Card'&&!card) return Promise.reject(new Error('Which card paid it?'));
   var inner='<rid>'+r.rid+'</rid>';
   var put=function(fid,val){ inner+='<field fid="'+fid+'">'+esc(val==null?'':val)+'</field>'; };
   if('arb' in v) put(17,v.arb); if('notes' in v) put(19,v.notes);

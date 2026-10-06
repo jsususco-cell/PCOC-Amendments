@@ -55,7 +55,7 @@ function PrepareCase({ c }: { c: Case }) {
   const need = [!h.drw && "Harold's drawings", !h.narr && "the Narrative", !(h.est && (!chk || match)) && "a Cost Estimate that matches Canopy"].filter(Boolean) as string[];
   const m = missing(c);
 
-  const save = (o: object, ok = "Saved.") => run("save", () => PC().saveCase(c.rid, o), (r: { stage: string }) => r?.stage && r.stage !== c.stage ? `${ok} ${c.cs} moved to ${r.stage}.` : ok);
+  const save = (o: object, ok = "Saved.") => run("save", () => PC().saveCase(c.rid, o), (r: { stage: string; from: string }) => r?.stage && r.from && r.stage !== r.from ? `${ok} ${c.cs} moved to ${r.stage}.` : ok);
   const mail = (key: string) => run("m" + key, () => PC().mail(c.rid, key), mailToast);
 
   return (

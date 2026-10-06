@@ -64,7 +64,7 @@ function WithPACase({ c }: { c: Case }) {
     texts: { pcoc: f.pcoc, cnId: f.cnId },
     dates: { npaOn: f.npaOn, cnSub: f.cnSub, sentPA: f.sentPA },
   }).then((r: { stage: string }) => { setNpa(null); return r; }),
-  (r: { stage: string }) => r?.stage && r.stage !== c.stage ? `Saved. ${c.cs} moved to ${r.stage}.` : "Saved.");
+  (r: { stage: string; from: string }) => r?.stage && r.from && r.stage !== r.from ? `Saved. ${c.cs} moved to ${r.stage}.` : "Saved.");
 
   return (
     <section className="card">

@@ -131,7 +131,7 @@ function PayCase({ c }: { c: Case }) {
   const [falReq, setFalReq] = useState(c.falReq);
   const [pcoc, setPcoc] = useState(c.pcoc);
   const m = missing(c);
-  const saveCase = (o: object, ok = "Saved.") => run("save", () => PC().saveCase(c.rid, o), (r: { stage: string }) => r?.stage && r.stage !== c.stage ? `${ok} ${c.cs} moved to ${r.stage}.` : ok);
+  const saveCase = (o: object, ok = "Saved.") => run("save", () => PC().saveCase(c.rid, o), (r: { stage: string; from: string }) => r?.stage && r.from && r.stage !== r.from ? `${ok} ${c.cs} moved to ${r.stage}.` : ok);
   const saveRows = (o: object, ok: string) => run("rows", () => PC().saveRowDocs(c.rid, o), ok);
   const open = (r: Row | undefined, fid: number, lk: string, title: string) => r && ((r as unknown as Record<string, string>)[lk] ? window.open((r as unknown as Record<string, string>)[lk], "_blank") : view(rowFile(r, fid), `${title} - ${c.cs}`));
 

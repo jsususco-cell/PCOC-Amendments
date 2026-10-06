@@ -38,7 +38,7 @@ function ProofCase({ c }: { c: Case }) {
   const [closeSent, setCloseSent] = useState(c.closeSent);
   const proofOk = h.sign && (h.cert || !!rr);
   const m = missing(c);
-  const save = (o: object, ok = "Saved.") => run("save", () => PC().saveCase(c.rid, o), (r: { stage: string }) => r?.stage && r.stage !== c.stage ? `${ok} ${c.cs} moved to ${r.stage}.` : ok);
+  const save = (o: object, ok = "Saved.") => run("save", () => PC().saveCase(c.rid, o), (r: { stage: string; from: string }) => r?.stage && r.from && r.stage !== r.from ? `${ok} ${c.cs} moved to ${r.stage}.` : ok);
 
   return (
     <section className="card">
