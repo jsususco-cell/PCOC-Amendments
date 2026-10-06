@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Eye, Send } from "lucide-react";
 import { ActionBar, Btn, DateField, DocRow, EDGE, FileBtn, HeldBanner, Kpi, NextBox, PageTitle, Pill, useAction } from "@/components/ui";
-import CaseLookup from "@/components/CaseLookup";
+import CaseLookup, { FromBanner } from "@/components/CaseLookup";
 import CaseHead from "@/components/CaseHead";
 import MailNote, { mailToast } from "@/components/MailNote";
 import { type Case, PC, caseFile, fname, have, inStep, limitOf, mailLive, missing, rowFile, rowsOf, us, useEngine, view } from "@/lib/engine";
@@ -24,7 +24,7 @@ export default function Proof() {
         <Kpi label="Waiting for the PCOC" value={inStep("E").length} sub="proof sent to the PA" edge={EDGE.green} />
       </div>
       {!mailLive() && <HeldBanner />}
-      <CaseLookup queue={queue} selected={c} onPick={pick} stepKey="D" />
+      <CaseLookup queue={queue} selected={c} onPick={pick} stepKey="D" from={{ label: "3 · Pay the town", list: inStep("C") }} />
       {c && <ProofCase key={c.rid} c={c} />}
     </>
   );
@@ -43,6 +43,7 @@ function ProofCase({ c }: { c: Case }) {
   return (
     <section className="card">
       <CaseHead c={c} right={c.paid ? <p className="mt-1.5 text-xs text-mute">Paid {us(c.paid)}</p> : null} />
+      <FromBanner c={c} stepKey="D"><span className="text-xs text-mute">Put in "Taxes paid on" in 3 · Pay the town first: then it moves here by itself.</span></FromBanner>
       {m[0] && <div className="mx-5 mb-3.5"><NextBox>{m[0]}</NextBox></div>}
       <DocRow state={h.sign ? "ok" : c.stkr ? "wait" : "no"} name="Sticker with the new permit number on the job sign"
         detail={c.pcoc ? `New number: ${c.pcoc}. Our inspectors put the sticker on the existing sign and send a photo.` : "Type the new permit number first (Step 2)."}

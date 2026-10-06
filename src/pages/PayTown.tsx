@@ -3,8 +3,9 @@ import { Link, useSearchParams } from "react-router-dom";
 import { Eye, Mail, Printer } from "lucide-react";
 import { ActionBar, Btn, DateField, DocRow, EDGE, Empty, FileBtn, HeldBanner, Kpi, NextBox, PageTitle, Pill, TextField, useAction } from "@/components/ui";
 import CaseHead from "@/components/CaseHead";
+import { FromBanner } from "@/components/CaseLookup";
 import MailNote, { mailToast } from "@/components/MailNote";
-import { type Case, type Row, PC, caseFile, fname, daysOf, have, inStep, limitOf, mailLive, missing, money, overdue, rowFile, rowsOf, us, useEngine, view } from "@/lib/engine";
+import { type Case, type Row, PC, caseFile, cases, fname, daysOf, have, inStep, limitOf, mailLive, missing, money, overdue, rowFile, rowsOf, us, useEngine, view } from "@/lib/engine";
 import { cn, downloadBytes } from "@/lib/utils";
 
 const due = (r: Row) => (r.adue || 0) + (r.pdue || 0);
@@ -54,6 +55,15 @@ export default function PayTown() {
       </div>
       {!mailLive() && <HeldBanner />}
 
+      <section className="card flex flex-wrap items-center gap-3 px-5 py-3.5">
+        <label htmlFor="from-b" className="text-sm font-semibold">Bring in a case from 2 · With the PA</label>
+        <select id="from-b" className="input min-w-[18rem]" value="" disabled={!inStep("B").length}
+          onChange={(e) => e.target.value && setCase(e.target.value)}>
+          <option value="">{inStep("B").length ? `From 2 · With the PA (${inStep("B").length})…` : "Nothing in 2 · With the PA"}</option>
+          {inStep("B").map((c) => <option key={c.rid} value={c.cs}>{c.cs} · {c.muni || "—"} · {daysOf(c)} d</option>)}
+        </select>
+        <span className="text-xs text-mute">The case opens below. It moves here by itself once its Notice is in.</span>
+      </section>
       {towns.length === 0 ? <section className="card"><Empty>No case is waiting to be paid.</Empty></section> : (
         <>
           <div>
@@ -116,6 +126,7 @@ export default function PayTown() {
           {open && town?.L.find((c) => c.cs === open) && <PayCase key={open} c={town.L.find((x) => x.cs === open)!} />}
         </>
       )}
+      {open && !queue.some((c) => c.cs === open) && cases().find((c) => c.cs === open) && <PayCase key={open} c={cases().find((c) => c.cs === open)!} />}
     </>
   );
 }
@@ -138,6 +149,7 @@ function PayCase({ c }: { c: Case }) {
   return (
     <section className="card">
       <CaseHead c={c} right={<p className="mt-1.5 text-sm"><b>{Object.values(p).filter(Boolean).length}</b> <span className="text-xs text-mute">of 4 papers for the town</span></p>} />
+      <FromBanner c={c} stepKey="C"><span className="text-xs text-mute">You can gather its papers now. It moves to this step by itself when its Permit Amendment Notification is in.</span></FromBanner>
       {m[0] && <div className="mx-5 mb-3.5"><NextBox>{m[0]}</NextBox></div>}
       <div className="mx-5 mb-1 text-xs text-mute">The town gets these four, and only these four.</div>
 

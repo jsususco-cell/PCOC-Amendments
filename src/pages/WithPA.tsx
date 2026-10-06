@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Upload } from "lucide-react";
 import { ActionBar, Btn, DateField, EDGE, Empty, HeldBanner, Kpi, NextBox, PageTitle, Pill, TextField, useAction } from "@/components/ui";
-import CaseLookup from "@/components/CaseLookup";
+import CaseLookup, { FromBanner } from "@/components/CaseLookup";
 import CaseHead from "@/components/CaseHead";
 import MailNote, { mailToast } from "@/components/MailNote";
 import { type Case, PC, daysOf, have, inStep, limitOf, mailLive, missing, rowFile, rowsOf, us, useEngine, view } from "@/lib/engine";
@@ -45,7 +45,7 @@ export default function WithPA() {
         )}
       </section>
 
-      <CaseLookup queue={queue} selected={c} onPick={pick} stepKey="B" />
+      <CaseLookup queue={queue} selected={c} onPick={pick} stepKey="B" from={{ label: "1 · Prepare", list: inStep("A") }} />
       {c && <WithPACase key={c.rid} c={c} />}
     </>
   );
@@ -69,6 +69,7 @@ function WithPACase({ c }: { c: Case }) {
   return (
     <section className="card">
       <CaseHead c={c} />
+      <FromBanner c={c} stepKey="B"><span className="text-xs text-mute">Put in "Sent to the PA on", or the Notice when it comes: the case moves on by itself when you save.</span></FromBanner>
       {m[0] && <div className="mx-5 mb-4"><NextBox>{m[0]}</NextBox></div>}
       <label className="mx-5 flex cursor-pointer flex-col items-center rounded-xl border-2 border-dashed border-[#cfd6e2] bg-[#fafbfd] px-6 py-6 text-center hover:border-navy">
         <Upload className="h-7 w-7 text-navy" />

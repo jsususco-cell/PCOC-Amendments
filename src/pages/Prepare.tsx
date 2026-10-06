@@ -2,11 +2,11 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Eye, FileText, Mail, Send, Sparkles } from "lucide-react";
 import { ActionBar, Btn, DateField, DocRow, EDGE, FileBtn, HeldBanner, Kpi, NextBox, PageTitle, Pill, TextField, useAction } from "@/components/ui";
-import CaseLookup from "@/components/CaseLookup";
+import CaseLookup, { FromBanner, INTAKE_STAGES } from "@/components/CaseLookup";
 import CaseHead from "@/components/CaseHead";
 import ScopePreview from "@/components/ScopePreview";
 import MailNote, { mailToast } from "@/components/MailNote";
-import { type Case, PC, W, caseFile, daysOf, downloadUrl, have, inStep, limitOf, mailLive, missing, money, msOf, rowFile, rowsOf, todayIso, us, useEngine, view } from "@/lib/engine";
+import { type Case, PC, W, caseFile, cases, daysOf, downloadUrl, have, inStep, limitOf, mailLive, missing, money, msOf, rowFile, rowsOf, todayIso, us, useEngine, view } from "@/lib/engine";
 import { useSelectedCase } from "@/lib/useCase";
 
 export default function Prepare() {
@@ -28,7 +28,8 @@ export default function Prepare() {
         <Kpi label="No current scope file" value={noScope} sub="scope file does not match Canopy yet" edge={EDGE.amber} />
       </div>
       {!mailLive() && <HeldBanner />}
-      <CaseLookup queue={queue} selected={c} onPick={pick} stepKey="A" />
+      <CaseLookup queue={queue} selected={c} onPick={pick} stepKey="A"
+        from={{ label: "Intake", list: cases().filter((x) => INTAKE_STAGES.includes(x.stage)).sort((a, b) => daysOf(b) - daysOf(a)) }} />
       {c ? <PrepareCase key={c.rid} c={c} /> : null}
     </>
   );
@@ -80,6 +81,10 @@ function PrepareCase({ c }: { c: Case }) {
     <section className="card">
       {preview && <ScopePreview c={c} onClose={() => setPreview(false)} />}
       <CaseHead c={c} right={<p className="mt-1.5 text-sm"><b>{3 - need.length}</b> <span className="text-xs text-mute">of 3 papers ready</span></p>} />
+      <FromBanner c={c} stepKey="A">
+        <Btn busy={busy === "move"} onClick={() => run("move", () => PC().decide(c.rid, "amend"), `${c.cs} moved to 1 · Prepare.`)}>Move to 1 · Prepare</Btn>
+        <span className="text-xs text-mute">It needs an amendment: the work starts here.</span>
+      </FromBanner>
       {m[0] && <div className="mx-5 mb-3.5"><NextBox>{m[0]}</NextBox></div>}
       {c.issues && <div className="mx-5 mb-3.5 rounded-lg border border-[#fed7aa] bg-[#fff7ed] px-3 py-2 text-xs text-[#9a3412]">Heads up, the OLD narrative for this case had mistakes: {c.issues} The new one fixes this.</div>}
 
