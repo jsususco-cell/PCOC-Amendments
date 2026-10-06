@@ -68,6 +68,9 @@ export const isoDate = (v: unknown): string => {
   return /^\d{4}-\d{2}-\d{2}/.test(s) ? s.slice(0, 10) : "";
 };
 const round = (n: number) => Math.round(n * 100) / 100;
+/** Canopy writes some case numbers as "PR-R3-11697 (BR)"; PCOC (Jim's import)
+ *  uses "PR-R3-11697". They are the same case: compare without the suffix. */
+export const caseKey = (cs: string) => String(cs ?? "").replace(/\s*\(BR\)\s*$/i, "").trim();
 const cons = (h: number, c: number, red: number) => round(h + c - red);
 export const money = (n: number) => (n < 0 ? "-$" : "$") + Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -97,9 +100,10 @@ export async function buildPlan(): Promise<Plan> {
   const byCase: Record<string, Rec[]> = {};
   for (const r of scAll) {
     if (!/^approved$/i.test(str(r, SCF.status))) continue;
-    const cs = str(r, SCF.cs); if (!cs) continue;
+    const cs = caseKey(str(r, SCF.cs)); if (!cs) continue;
     (byCase[cs] = byCase[cs] || []).push(r);
   }
+  const pcocScopeIds = new Set(rows.map((x) => str(x, 6)));
   const plan: Plan = { at: new Date().toISOString(), rows: [], cases: [], review: [], noPermitDate: [], check: { cases: 0, amountsMatched: 0, amountsOff: [] } };
 
   for (const [cs, list] of Object.entries(byCase)) {
@@ -122,7 +126,7 @@ export async function buildPlan(): Promise<Plan> {
     const now = cons(num(val(last, SCF.hardRev)), num(val(last, SCF.capRev)), num(val(last, SCF.redRev)));
     const amount = round(now - atPermit);
 
-    const inPcoc = rows.filter((x) => str(x, 7) === cs);
+    const inPcoc = rows.filter((x) => caseKey(str(x, 7)) === cs);
     if (inPcoc.length) {
       const numeric = inPcoc.filter((x) => /^\d+$/.test(str(x, 6)));
       if (numeric.length) {
@@ -153,8 +157,10 @@ export async function buildPlan(): Promise<Plan> {
       [sA, sN] = pair(SCF.softPrev, SCF.softRev), [tA, tN] = pair(SCF.tempPrev, SCF.tempRev),
       [xA, xN] = pair(SCF.taxPrev, SCF.taxRev), [oA, oN] = pair(SCF.toPrev, SCF.toRev);
     const rA = num(redPrevOf(first)), rN = num(val(last, SCF.redRev));
+    if (!counting.some((r) => !pcocScopeIds.has(str(r, SCF.id)))) continue;
     plan.cases.push(cs);
     for (const r of counting) {
+      if (pcocScopeIds.has(str(r, SCF.id))) continue; // already in PCOC under another case number
       plan.rows.push({
         cs, scopeChangeId: str(r, SCF.id), type: str(r, SCF.type), approved: isoDate(val(r, SCF.approved)),
         permitDate: permit, permitFrom, permitNo: job ? str(job, JF.permitNo) : "", family, constructionStatus: consStatus,
@@ -186,10 +192,12 @@ export async function applyPlan(plan: Plan): Promise<{ casesAdded: number; rowsA
   for (const r of await all(T.RATES, [6, 8, 14])) rates[str(r, 6)] = { rate: num(val(r, 8)), prate: num(val(r, 14)) };
 
   // Re-check right before writing: another run may have added the same case.
-  const existing = new Set((await all(T.ROWS, [7])).map((r) => str(r, 7)));
-  const existingCases = new Set((await all(T.CASES, [6])).map((r) => str(r, 6)));
+  const nowRows = await all(T.ROWS, [6, 7]);
+  const existing = new Set(nowRows.map((r) => caseKey(str(r, 7))));
+  const existingIds = new Set(nowRows.map((r) => str(r, 6)));
+  const existingCases = new Set((await all(T.CASES, [6])).map((r) => caseKey(str(r, 6))));
   const byCase: Record<string, NewRow[]> = {};
-  for (const r of plan.rows) if (!existing.has(r.cs)) (byCase[r.cs] = byCase[r.cs] || []).push(r);
+  for (const r of plan.rows) if (!existing.has(r.cs) && !existingIds.has(r.scopeChangeId)) (byCase[r.cs] = byCase[r.cs] || []).push(r);
 
   let casesAdded = 0, rowsAdded = 0;
   for (const [cs, list] of Object.entries(byCase)) {
