@@ -4,13 +4,17 @@ import { Eye, Mail, Printer } from "lucide-react";
 import { ActionBar, Btn, DateField, DocRow, EDGE, Empty, FileBtn, HeldBanner, Kpi, NextBox, PageTitle, Pill, TextField, useAction } from "@/components/ui";
 import CaseHead from "@/components/CaseHead";
 import MailNote, { mailToast } from "@/components/MailNote";
-import { type Case, type Row, PC, caseFile, daysOf, have, inStep, limitOf, mailLive, missing, money, overdue, rowFile, rowsOf, us, useEngine, view } from "@/lib/engine";
+import { type Case, type Row, PC, caseFile, fname, daysOf, have, inStep, limitOf, mailLive, missing, money, overdue, rowFile, rowsOf, us, useEngine, view } from "@/lib/engine";
 import { cn, downloadBytes } from "@/lib/utils";
 
 const due = (r: Row) => (r.adue || 0) + (r.pdue || 0);
-const papers = (c: Case) => { const h = have(c); return { N: h.npa, R: h.rcpt, E: h.est, F: h.fal, T: h.to }; };
-const ready = (c: Case) => { const p = papers(c); return p.N && p.R && p.E && p.F; };
-const LEGEND: [string, string][] = [["N", "Permit Amendment Notice"], ["R", "Receipt from the first tax payment"], ["E", "Cost Estimate"], ["F", "Final Acceptance Letter"], ["T", "PRDOH task order (if we have it)"]];
+/* The town asks for exactly these four (Priscilla, 2026-10-06). */
+const papers = (c: Case) => {
+  const h = have(c);
+  return { N: h.npa, F: h.fal, R: h.rcpt, C: rowsOf(c).some((r) => !!r.sheet) };
+};
+const ready = (c: Case) => { const p = papers(c); return p.N && p.F && p.R && p.C; };
+const LEGEND: [string, string][] = [["N", "Permit Amendment Notification"], ["F", "Final Acceptance Letter"], ["R", "Receipt of the original taxes paid"], ["C", "Our calculation sheet"]];
 
 export default function PayTown() {
   useEngine();
@@ -41,7 +45,7 @@ export default function PayTown() {
 
   return (
     <>
-      <PageTitle title="3 · Pay the town" who="Priscilla" ends="a trip is logged as Paid. Cases are grouped by town, so one trip pays them all." />
+      <PageTitle title="3 · Pay the town" who="Priscilla" ends="the taxes are paid at the town (in person). Cases are grouped by town, so one trip pays them all." />
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Kpi label="Ready to pay" value={queue.length} sub={`cases in this step · limit ${limitOf("C")} days`} edge={EDGE.navy} />
         <Kpi label="To pay" value={money(total)} sub="arbitrios + patentes, our figure" edge={EDGE.navy} />
@@ -84,7 +88,7 @@ export default function PayTown() {
                 <tbody>
                   {town.L.map((c) => {
                     const R = rowsOf(c), p = papers(c);
-                    const miss = LEGEND.filter(([k]) => k !== "T" && !p[k as keyof typeof p]).map(([, n]) => n);
+                    const miss = LEGEND.filter(([k]) => !p[k as keyof typeof p]).map(([, n]) => n);
                     return (
                       <tr key={c.rid} className={cn(open === c.cs && "bg-[#f3f6fb]")}>
                         <td className="td"><b>{c.cs}</b><div className="text-xs text-mute">{c.pcoc ? `New permit ${c.pcoc} · ` : ""}<span className={cn(overdue(c) && "font-semibold text-bad-ink")}>{daysOf(c)} days</span></div></td>
@@ -94,7 +98,7 @@ export default function PayTown() {
                         <td className="td whitespace-nowrap">{LEGEND.map(([k, n]) => {
                           const ok = p[k as keyof typeof p];
                           return <span key={k} title={`${n}: ${ok ? "in hand" : "missing"}`} className={cn("mr-1 inline-flex h-6 w-6 items-center justify-center rounded-md text-[10.5px] font-bold",
-                            ok ? "bg-ok-bg text-ok-ink" : k === "T" ? "bg-[#eef1f6] text-mute" : "bg-bad-bg text-bad-ink")}>{k}</span>;
+                            ok ? "bg-ok-bg text-ok-ink" : "bg-bad-bg text-bad-ink")}>{k}</span>;
                         })}</td>
                         <td className="td">{ready(c) ? <Pill tone="ok">Ready</Pill> : <Pill tone="bad">{miss[0]?.split(" ").slice(0, 3).join(" ")} missing</Pill>}</td>
                         <td className="td"><Btn kind="outline" onClick={() => setCase(open === c.cs ? null : c.cs)}>{open === c.cs ? "Close" : "Open"}</Btn></td>
@@ -105,7 +109,7 @@ export default function PayTown() {
               </table>
               <div className="flex flex-wrap gap-4 px-5 py-3 text-xs text-mute">
                 {LEGEND.map(([k, n]) => <span key={k}><b className="text-ink">{k}</b> {n}</span>)}
-                <span>Each case also carries our letter to the town and the calculation sheet.</span>
+                <span>The town gets these four and nothing else.</span>
               </div>
             </section>
           )}
@@ -119,9 +123,10 @@ export default function PayTown() {
 function PayCase({ c }: { c: Case }) {
   const { busy, run } = useAction();
   const h = have(c);
+  const p = papers(c);
   const R = rowsOf(c);
-  const r3 = R.find((r) => r.d3 || r.l3), r4 = R.find((r) => r.d4 || r.l4), r0 = R[0];
-  const [tlink, setTlink] = useState("");
+  const r1 = R.find((r) => r.d1 || r.l1), r3 = R.find((r) => r.d3 || r.l3), r0 = R[0];
+  const rs = R.find((r) => r.sheet);
   const [paid, setPaid] = useState(c.paid);
   const [falReq, setFalReq] = useState(c.falReq);
   const [pcoc, setPcoc] = useState(c.pcoc);
@@ -132,45 +137,48 @@ function PayCase({ c }: { c: Case }) {
 
   return (
     <section className="card">
-      <CaseHead c={c} />
+      <CaseHead c={c} right={<p className="mt-1.5 text-sm"><b>{Object.values(p).filter(Boolean).length}</b> <span className="text-xs text-mute">of 4 papers for the town</span></p>} />
       {m[0] && <div className="mx-5 mb-3.5"><NextBox>{m[0]}</NextBox></div>}
-      <DocRow state={h.npa ? "ok" : "no"} name="Permit Amendment Notice" detail="From the PA (Step 2)" pill={h.npa ? <Pill tone="ok">In hand</Pill> : <Pill tone="bad">Missing</Pill>}>
-        {h.npa && <Btn kind="outline" onClick={() => open(R.find((r) => r.d1 || r.l1), 46, "l1", "Permit Amendment Notice")}><Eye className="h-4 w-4" />View</Btn>}
+      <div className="mx-5 mb-1 text-xs text-mute">The town gets these four, and only these four.</div>
+
+      <DocRow state={h.npa ? "ok" : "no"} name="1. Permit Amendment Notification" detail="From the PA (Step 2). It has the new permit number."
+        pill={h.npa ? <Pill tone="ok">In hand</Pill> : <Pill tone="bad">Missing</Pill>}>
+        {r1 && <Btn kind="outline" onClick={() => open(r1, 46, "l1", "Permit Amendment Notification")}><Eye className="h-4 w-4" />View</Btn>}
       </DocRow>
-      <DocRow state={h.rcpt ? "ok" : "no"} name="Receipt from the first tax payment" detail="The arbitrio receipt from when the permit was issued" pill={h.rcpt ? <Pill tone="ok">In hand</Pill> : <Pill tone="bad">Missing</Pill>}>
+      <DocRow state={h.fal ? "ok" : c.falReq ? "wait" : "no"} name="2. Final Acceptance Letter"
+        detail={<>{c.fal || (c.falReq ? `Asked the PMs ${us(c.falReq)}` : "Ask the PMs by email. They send it back.")}<MailNote c={c} kind="fal" /></>}
+        pill={h.fal ? <Pill tone="ok">In hand</Pill> : c.falReq ? <Pill tone="wait">Asked</Pill> : <Pill tone="bad">Missing</Pill>}>
+        {c.fal && <Btn kind="outline" onClick={() => view(caseFile(c, 24), `Final Acceptance Letter - ${c.cs}`)}><Eye className="h-4 w-4" />View</Btn>}
+        {!h.fal && <Btn kind="outline" busy={busy === "mfal"} onClick={() => run("mfal", () => PC().mail(c.rid, "fal"), mailToast)}><Mail className="h-4 w-4" />{c.falReq ? "Ask the PMs again" : "Ask the PMs"}</Btn>}
+        <FileBtn label={h.fal ? "Replace" : "Upload"} accept=".pdf,image/*" busy={busy === "save"} onFile={(f) => saveCase({ files: { fal: f } }, "Final Acceptance Letter saved.")} />
+      </DocRow>
+      <DocRow state={h.rcpt ? "ok" : "no"} name="3. Receipt of the original taxes paid" detail="The arbitrio receipt from before construction started"
+        pill={h.rcpt ? <Pill tone="ok">In hand</Pill> : <Pill tone="bad">Missing</Pill>}>
         {r3 && <Btn kind="outline" onClick={() => open(r3, 48, "l3", "Original arbitrio receipt")}><Eye className="h-4 w-4" />View</Btn>}
         <FileBtn label={h.rcpt ? "Replace" : "Upload"} accept=".pdf,image/*" busy={busy === "rows"} onFile={(f) => saveRows({ d3: f }, "Receipt saved on the case.")} />
       </DocRow>
-      <DocRow state={h.est ? "ok" : "no"} name="Cost Estimate" detail="Made in Step 1" pill={h.est ? <Pill tone="ok">In hand</Pill> : <Pill tone="bad">Missing</Pill>}>
-        {h.est && <Btn kind="outline" onClick={() => open(R.find((r) => r.d2 || r.l2), 47, "l2", "Cost Estimate")}><Eye className="h-4 w-4" />View</Btn>}
+      <DocRow state={rs ? "ok" : "no"} name="4. Our calculation sheet" detail={rs ? `${fname(rs.sheet)}${rs.sheetOn ? " · built " + us(rs.sheetOn) : ""}` : "Case summary and what is subject to patente and taxes. Built from the latest scope change."}
+        pill={rs ? <Pill tone="ok">Built</Pill> : <Pill tone="bad">Not built</Pill>}>
+        {rs && <Btn kind="outline" onClick={() => view(rowFile(rs, 66), `Calculo de Arbitrios - ${c.cs}`)}><Eye className="h-4 w-4" />View</Btn>}
+        <Btn kind={rs ? "outline" : "primary"} busy={busy === "sheet"} onClick={() => run("sheet", () => PC().buildSheet(c.rid), "Calculation sheet built.")}>{rs ? "Rebuild" : "Build it"}</Btn>
       </DocRow>
-      <DocRow state={h.fal ? "ok" : c.falReq ? "wait" : "no"} name="Final Acceptance Letter"
-        detail={<>{c.fal || (c.falReq ? `Asked ${us(c.falReq)}` : "Not asked yet")}<MailNote c={c} kind="fal" /></>}
-        pill={h.fal ? <Pill tone="ok">In hand</Pill> : <Pill tone="bad">Missing</Pill>}>
-        {c.fal && <Btn kind="outline" onClick={() => view(caseFile(c, 24), `Final Acceptance Letter - ${c.cs}`)}><Eye className="h-4 w-4" />View</Btn>}
-        {!h.fal && <Btn kind="outline" busy={busy === "mfal"} onClick={() => run("mfal", () => PC().mail(c.rid, "fal"), mailToast)}><Mail className="h-4 w-4" />Ask for it</Btn>}
-        <FileBtn label={h.fal ? "Replace" : "Upload"} accept=".pdf,image/*" busy={busy === "save"} onFile={(f) => saveCase({ files: { fal: f } }, "Final Acceptance Letter saved.")} />
-      </DocRow>
-      <DocRow state={h.to ? "ok" : "wait"} name="PRDOH task order (extra, if we have it)" detail={r4 ? (r4.tokind || "Notice of Issued Task Order") : "Optional"} pill={h.to ? <Pill tone="ok">In hand</Pill> : <Pill>Optional</Pill>}>
-        {r4 && <Btn kind="outline" onClick={() => open(r4, 68, "l4", "PRDOH task order")}><Eye className="h-4 w-4" />View</Btn>}
-        <FileBtn label="Upload" accept=".pdf,image/*" busy={busy === "rows"} onFile={(f) => saveRows({ d4: f }, "Task order saved on the case.")} />
-        <input className="input w-44" placeholder="or paste Drive link" value={tlink} onChange={(e) => setTlink(e.target.value)} />
-        {tlink && <Btn kind="outline" busy={busy === "rows"} onClick={() => saveRows({ l4: tlink.trim() }, "Task order link saved.")}>Save link</Btn>}
-      </DocRow>
-      <DocRow state={r0?.letter && r0?.sheet ? "ok" : "wait"} name="Our letter to the town and the calculation sheet" detail="Built by themselves on sync, rebuilt when a paper arrives"
-        pill={r0?.pack ? <Pill tone="ok">Pack built {us(r0.packOn)}</Pill> : <Pill tone="wait">No pack yet</Pill>}>
-        {r0?.letter && <Btn kind="outline" onClick={() => view(rowFile(r0, 61), `Carta al Municipio - ${c.cs}`)}>Letter</Btn>}
-        {r0?.sheet && <Btn kind="outline" onClick={() => view(rowFile(r0, 66), `Calculo de Arbitrios - ${c.cs}`)}>Calculation</Btn>}
-        {r0?.pack && <Btn kind="outline" onClick={() => view(rowFile(r0, 71), `Paquete Municipio - ${c.cs}`)}><Printer className="h-4 w-4" />Pack</Btn>}
-      </DocRow>
+
+      <div className="flex flex-wrap items-center gap-2 border-t border-[#eef1f6] px-5 py-3.5">
+        <Btn kind="outline" busy={busy === "pack"} onClick={() => run("pack", () => PC().buildPack(c.rid).then(() => view(rowFile(rowsOf(c)[0], 71), `Paquete Municipio - ${c.cs}`)))}>
+          <Printer className="h-4 w-4" />{r0?.pack ? "Rebuild and open the print pack" : "Build and open the print pack"}
+        </Btn>
+        <span className="text-xs text-mute">One PDF with the four papers, to print for the trip.{r0?.pack && r0?.packOn ? ` Last built ${us(r0.packOn)}.` : ""}</span>
+        {r0?.letter && <button className="ml-auto text-xs font-semibold text-navy underline" onClick={() => view(rowFile(r0, 61), `Carta al Municipio - ${c.cs}`)}>Our cover letter to the town (extra)</button>}
+      </div>
+
       <div className="grid grid-cols-1 gap-3 border-t border-[#eef1f6] px-5 py-3.5 md:grid-cols-3">
-        <DateField label="Asked for the Final Acceptance Letter on" value={falReq} onChange={setFalReq} />
-        <DateField label="Taxes paid on (a Paid trip fills this in)" value={paid} onChange={setPaid} />
+        <DateField label="Taxes paid on" value={paid} onChange={setPaid} />
+        <DateField label="Asked the PMs for the letter on" value={falReq} onChange={setFalReq} />
         <TextField label="New permit number (PCOC)" value={pcoc} onChange={setPcoc} placeholder="2025-123456-PCOC-123456" />
       </div>
-      <ActionBar note={<>When paid, this case moves to <b>4 · Proof to the PA</b>. Log the trip so the payment and the Canopy note are recorded.</>}>
+      <ActionBar note={<>With the paid date in, this case moves to <b>4 · Proof to the PA</b>. Put what the town actually charged in Payments, or log the trip.</>}>
         <Btn kind="go" busy={busy === "save"} onClick={() => saveCase({ dates: { paid, falReq }, texts: { pcoc } })}>Save</Btn>
-        <Link className="btn border-navy bg-navy text-white no-underline hover:text-white" to={`/trips?town=${encodeURIComponent(c.muni)}&case=${encodeURIComponent(c.cs)}`}>Log a trip for this case</Link>
+        <Link className="btn border-[#cfd6e2] bg-white text-navy no-underline hover:border-navy" to={`/trips?town=${encodeURIComponent(c.muni)}&case=${encodeURIComponent(c.cs)}`}>Log the trip (optional)</Link>
       </ActionBar>
     </section>
   );

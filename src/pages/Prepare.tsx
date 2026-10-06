@@ -4,7 +4,7 @@ import { ActionBar, Btn, DateField, DocRow, EDGE, FileBtn, HeldBanner, Kpi, Next
 import CaseLookup from "@/components/CaseLookup";
 import CaseHead from "@/components/CaseHead";
 import MailNote, { mailToast } from "@/components/MailNote";
-import { type Case, PC, W, caseFile, daysOf, downloadUrl, have, inStep, limitOf, mailLive, missing, money, rowFile, rowsOf, todayIso, us, useEngine, view } from "@/lib/engine";
+import { type Case, PC, W, caseFile, daysOf, downloadUrl, have, inStep, limitOf, mailLive, missing, money, msOf, rowFile, rowsOf, todayIso, us, useEngine, view } from "@/lib/engine";
 import { useSelectedCase } from "@/lib/useCase";
 
 export default function Prepare() {
@@ -12,16 +12,17 @@ export default function Prepare() {
   const queue = inStep("A");
   const [c, pick] = useSelectedCase(queue);
   const oldest = queue[0];
-  const waitingHarold = queue.filter((x) => x.drwReq && !x.drw).length;
+  const headsUp = queue.filter((x) => !msOf(x).substantial).length;
   const noScope = queue.filter((x) => !(x.estChk || "").startsWith("MATCH")).length;
 
   return (
     <>
-      <PageTitle title="1 · Prepare" who="our permit team" ends="the 3 papers (Cost Estimate, Project Narrative, Harold's new drawings) are sent to the PA." />
+      <PageTitle title="1 · Prepare" who="Priscilla" ends="the 3 papers (Project Narrative, Cost Estimate, Harold's revised drawings) are sent to the PA." />
+      <p className="-mt-3 text-[13px] text-mute">A case shows up here when Structure passes, as a heads-up. The work starts at the Substantial/Finishes inspection.</p>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Kpi label="In this step" value={queue.length} sub={`limit ${limitOf("A")} days`} edge={EDGE.navy} />
         <Kpi label="Oldest" value={oldest ? `${daysOf(oldest)} days` : "—"} sub={oldest?.cs ?? "nothing waiting"} edge={EDGE.amber} />
-        <Kpi label="Waiting on Harold" value={waitingHarold} sub="drawings asked, not in" edge={EDGE.red} />
+        <Kpi label="Heads-up only" value={headsUp} sub="Structure passed, Substantial not yet" edge={EDGE.amber} />
         <Kpi label="No current scope file" value={noScope} sub="scope file does not match Canopy yet" edge={EDGE.amber} />
       </div>
       {!mailLive() && <HeldBanner />}
@@ -103,14 +104,28 @@ function PrepareCase({ c }: { c: Case }) {
         {h.narr && !h.narrOk && <Btn busy={busy === "save"} onClick={() => save({ dates: { narrOk: todayIso() } }, "Narrative marked checked.")}>Mark checked</Btn>}
       </DocRow>
 
-      <DocRow state={h.drw ? "ok" : c.drwReq ? "wait" : "no"} name="New drawings from Harold"
-        detail={<>{c.drw ? `${c.drw}${c.drwRec ? " · got " + us(c.drwRec) : ""}` : c.drwReq ? `Asked ${us(c.drwReq)}` : "Not asked yet"}<MailNote c={c} kind="drw" /></>}
+      <DocRow state={h.drw ? "ok" : c.drwReq ? "wait" : "no"} name="Harold's revised drawings"
+        detail={<>{c.drw ? `${c.drw}${c.drwRec ? " · uploaded " + us(c.drwRec) : ""}` : "Signed by Harold. They should already be in Smartsheet: upload them here."}{c.drwReq && !c.drw && ` Asked Harold ${us(c.drwReq)}.`}<MailNote c={c} kind="drw" /></>}
         pill={h.drw ? <Pill tone="ok">In hand</Pill> : <Pill tone="bad">Not here yet</Pill>}>
         {c.drw && <Btn kind="outline" onClick={() => view(caseFile(c, 15), `Drawings - ${c.cs}`)}><Eye className="h-4 w-4" />View</Btn>}
-        {!c.drw && <Btn kind="outline" busy={busy === "mdrw"} disabled={!h.narr || !W.G?.set?.harold}
-          title={!h.narr ? "Make the Narrative first" : ""} onClick={() => mail("drw")}><Mail className="h-4 w-4" />{c.drwReq ? "Ask again" : "Email Harold"}</Btn>}
-        {!c.drw && c.drwReq && <Btn kind="outline" busy={busy === "rem"} onClick={() => run("rem", () => PC().remindHarold(c.rid), mailToast)}>Send a reminder</Btn>}
-        <FileBtn label="Upload" accept=".pdf,image/*" busy={busy === "save"} onFile={(f) => save({ files: { drw: f } }, "Drawings saved.")} />
+        <FileBtn label={c.drw ? "Replace" : "Upload drawings"} kind={c.drw ? "outline" : "primary"} accept=".pdf,image/*" busy={busy === "save"} onFile={(f) => save({ files: { drw: f } }, "Drawings saved.")} />
+        {!c.drw && (
+          <details className="text-xs">
+            <summary className="cursor-pointer py-2.5 font-semibold text-navy">Not in Smartsheet?</summary>
+            <div className="flex flex-wrap gap-1.5">
+              <Btn kind="outline" busy={busy === "mdrw"} disabled={!h.narr || !W.G?.set?.harold} title={!h.narr ? "Make the Narrative first" : ""} onClick={() => mail("drw")}><Mail className="h-4 w-4" />{c.drwReq ? "Ask Harold again" : "Ask Harold"}</Btn>
+              {c.drwReq && <Btn kind="outline" busy={busy === "rem"} onClick={() => run("rem", () => PC().remindHarold(c.rid), mailToast)}>Remind Harold</Btn>}
+            </div>
+          </details>
+        )}
+      </DocRow>
+
+      <DocRow state={h.fal ? "ok" : c.falReq ? "wait" : "no"} name="Final Acceptance Letter (for the town, later)"
+        detail={<>{c.fal || (c.falReq ? `Asked the PMs ${us(c.falReq)}` : "Ask the PMs now, so it is here by the time you pay the town. A short email, no attachments.")}<MailNote c={c} kind="fal" /></>}
+        pill={h.fal ? <Pill tone="ok">In hand</Pill> : c.falReq ? <Pill tone="wait">Asked</Pill> : <Pill tone="bad">Not asked</Pill>}>
+        {c.fal && <Btn kind="outline" onClick={() => view(caseFile(c, 24), `Final Acceptance Letter - ${c.cs}`)}><Eye className="h-4 w-4" />View</Btn>}
+        {!h.fal && <Btn kind="outline" busy={busy === "mfal"} onClick={() => mail("fal")}><Mail className="h-4 w-4" />{c.falReq ? "Ask the PMs again" : "Ask the PMs"}</Btn>}
+        <FileBtn label={h.fal ? "Replace" : "Upload"} accept=".pdf,image/*" busy={busy === "save"} onFile={(f) => save({ files: { fal: f } }, "Final Acceptance Letter saved.")} />
       </DocRow>
 
       <details className="border-t border-[#eef1f6] px-5 py-3">

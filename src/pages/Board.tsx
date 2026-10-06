@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { RefreshCw, Search } from "lucide-react";
 import { Btn, EDGE, Empty, Kpi, PageTitle, Pill } from "@/components/ui";
-import { PARKED, PC, STEPS, cases, daysOf, inStep, limitOf, missing, overdue, pathOf, stageOf, useEngine } from "@/lib/engine";
+import { PARKED, PC, STEPS, cases, daysOf, inStep, limitOf, missing, msOf, overdue, pathOf, stageOf, useEngine } from "@/lib/engine";
 
 export default function Board() {
   useEngine();
@@ -61,7 +61,7 @@ export default function Board() {
                 <Link key={c.rid} to={pathOf(c)} className="mx-2.5 mt-2 block rounded-[10px] border border-line px-3 py-2.5 text-ink no-underline hover:border-navy">
                   <b>{c.cs}</b>
                   <div className="text-xs text-mute">{c.muni || "—"}</div>
-                  <div className="mt-1.5"><Pill tone={overdue(c) ? "bad" : daysOf(c) > limitOf(s.k) / 2 ? "wait" : "grey"}>{daysOf(c)} days</Pill></div>
+                  <div className="mt-1.5 flex flex-wrap gap-1"><Pill tone={overdue(c) ? "bad" : daysOf(c) > limitOf(s.k) / 2 ? "wait" : "grey"}>{daysOf(c)} days</Pill>{s.k === "A" && !msOf(c).substantial && <Pill tone="wait">heads-up</Pill>}</div>
                 </Link>
               ))}
               {L.length > 4 && <Link to={s.path} className="block px-3.5 py-2.5 text-[12.5px]">+ {L.length - 4} more</Link>}

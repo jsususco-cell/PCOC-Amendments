@@ -1,6 +1,6 @@
 import React from "react";
 import { Pill } from "./ui";
-import { type Case, daysOf, limitOf, money, overdue, rowsOf, stageOf } from "@/lib/engine";
+import { type Case, daysOf, limitOf, money, msOf, overdue, rowsOf, stageOf, us } from "@/lib/engine";
 
 /** The top of a case card: number, who/where, money, step pill, Drive folder. */
 export default function CaseHead({ c, right }: { c: Case; right?: React.ReactNode }) {
@@ -23,6 +23,7 @@ export default function CaseHead({ c, right }: { c: Case; right?: React.ReactNod
             {c.pcoc && <> · new permit <b className="text-ink">{c.pcoc}</b></>}
           </p>
         )}
+        <Milestones c={c} />
       </div>
       <div className="text-right">
         <Pill tone={late ? "bad" : daysOf(c) > limitOf(s?.k ?? "A") / 2 ? "wait" : "grey"}>
@@ -36,5 +37,17 @@ export default function CaseHead({ c, right }: { c: Case; right?: React.ReactNod
         </div>
       </div>
     </div>
+  );
+}
+
+/** Canopy milestones from the Job: Structure is the heads-up, Substantial/Finishes is when the work starts. */
+export function Milestones({ c }: { c: Case }) {
+  const m = msOf(c);
+  return (
+    <p className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs text-mute">
+      <span>Structure:</span>{m.structure ? <Pill tone="ok">{us(m.structure)}</Pill> : <Pill>not passed</Pill>}
+      <span className="ml-1">Substantial/Finishes:</span>{m.substantial ? <Pill tone="ok">{us(m.substantial)}</Pill> : <Pill tone="wait">not passed yet</Pill>}
+      {m.goal && <span className="ml-1">Canopy milestone goal: <b className="text-ink">{m.goal}</b></span>}
+    </p>
   );
 }

@@ -59,7 +59,9 @@ export const us = (iso: string): string => (iso ? W.us(iso) : "");
 export const todayIso = (): string => W.gtoday();
 
 export const stageOf = (c: Case): { k: string; n: string; l: string; h: string; d: string } | null => W.stOf(c);
-export const missing = (c: Case): string[] => W.missing(c) ?? [];
+/** Next things to do, in Priscilla's words (engine-app PC.next over page 177's missing()). */
+export const missing = (c: Case): string[] => PC().next(c) ?? [];
+export const msOf = (c: Case): { structure?: string; substantial?: string; goal?: string } => PC().msOf(c) ?? {};
 export const have = (c: Case) => W.have(c) as {
   narr: boolean; narrOk: boolean; est: boolean; estOk: boolean; drw: boolean; drwReq: boolean; npa: boolean;
   rcpt: boolean; to: boolean; fal: boolean; cert: boolean; sign: boolean; paid: boolean;
@@ -70,11 +72,11 @@ export const lastMail = (c: Case, kind: string) => W.lastMail(c, kind) as { st: 
 export const KIND = (): Record<string, string> => W.KIND;
 
 export const STEPS = [
-  { k: "A", n: "A · Prepare request", path: "/prepare", num: "1", label: "Prepare", who: "Our permit team" },
+  { k: "A", n: "A · Prepare request", path: "/prepare", num: "1", label: "Prepare", who: "Priscilla" },
   { k: "B", n: "B · With the PA", path: "/with-pa", num: "2", label: "With the PA", who: "The PA" },
   { k: "C", n: "C · Ready to pay", path: "/pay", num: "3", label: "Pay the town", who: "Priscilla" },
-  { k: "D", n: "D · Close-out to PA", path: "/proof", num: "4", label: "Proof to the PA", who: "Our permit team" },
-  { k: "E", n: "E · Closing", path: "/close", num: "5", label: "Close", who: "The PA" },
+  { k: "D", n: "D · Close-out to PA", path: "/proof", num: "4", label: "Proof to the PA", who: "Priscilla" },
+  { k: "E", n: "E · Closing", path: "/close", num: "5", label: "PCOC issued", who: "The PA" },
 ] as const;
 
 export const PARKED = ["Waiting · Structure not passed", "Finished · confirm with Priscilla", "Refund owed to us"];
@@ -94,3 +96,6 @@ export const pathOf = (c: Case): string => {
 };
 
 export const sumRows = (c: Case, f: (r: Row) => number) => rowsOf(c).reduce((t, r) => t + (f(r) || 0), 0);
+
+/** A file field from the money rows reads as "name.pdfhttps://…": keep the name. */
+export const fname = (v: string | undefined): string => String(v || "").split(/https?:\/\//)[0];

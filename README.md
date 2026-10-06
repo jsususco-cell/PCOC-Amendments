@@ -8,17 +8,19 @@ It replaces the Quickbase code page 177 UI with a Permitting Helper–style app.
 
 | Tab | Who | Ends when |
 |---|---|---|
-| **Board** | everyone | Overview: every case, its step, days in step, stuck list |
-| **Intake** | Priscilla | Each case is decided: needs an amendment, parked (Structure / finished house / refund), or not required |
-| **1 · Prepare** | permit team | Cost Estimate, Project Narrative and Harold's drawings are sent to the PA |
-| **2 · With the PA** | the PA | The Permit Amendment Notice is in and the new permit number is typed |
-| **3 · Pay the town** | Priscilla | A trip is logged as Paid (cases are grouped per town: one trip, one printed pack) |
-| **4 · Proof to the PA** | permit team | Sticker ordered, sign photo and town receipt in, proof sent |
-| **5 · Close** | the PA | Approved is marked in Canopy and the closed date is in |
-| Trips | Priscilla | Log every trip to a town. When it was paid, the same save records the payment on each scope change and posts the job cost |
-| Payments | Priscilla, managers | Money per scope change. Read-first table with a side panel. Never changes the amendment status |
+| **Board** | everyone | Overview: every case, its step, days in step, stuck list, heads-up flags |
+| **Intake** | Priscilla | Each case is decided. Only construction-cost changes count; temporary relocation does not |
+| **1 · Prepare** | Priscilla | Narrative, Cost Estimate and Harold's revised drawings (from Smartsheet) are sent to the PA. Cases appear when Structure passes (heads-up); work starts at Substantial/Finishes. Ask the PMs for the Final Acceptance Letter here |
+| **2 · With the PA** | the PA | The Permit Amendment Notification is in and the new permit number is typed |
+| **3 · Pay the town** | Priscilla | Taxes paid in person. The town gets exactly 4 papers: Notification, Final Acceptance Letter, original tax receipt, our calculation sheet |
+| **4 · Proof to the PA** | Priscilla | Inspectors put the sticker with the new number on the sign and send a photo; proof of payment and the photo go to the PA |
+| **5 · PCOC issued** | the PA, then Leslie | The PA issues the PCOC (final construction permit); one email hands the case to Leslie for the use permit |
+| Trips | Priscilla | Optional log of trips to a town; when paid, records the payment per scope change and posts the job cost |
+| Payments | Priscilla, managers | Money per scope change, including what the town actually charged. Never changes the amendment status |
 | Emails | Jim | Everything PCOC put in the KTO Outbox, the reminder rules and the mail settings (read-only) |
 | Rates | Priscilla | Arbitrio and patente rate per town. Saving recalculates every scope change in that town |
+
+The flow follows Priscilla's walkthrough of 2026-10-06.
 
 A case moves to the next step **by itself** once its dates and papers are in. The stage is derived (`derive()`), never typed.
 

@@ -55,11 +55,11 @@ export default function Emails() {
         <aside className="card px-4 py-4 text-[13px]">
           <h2 className="m-0 text-base font-bold">Reminder rules</h2>
           <p className="mb-1.5 mt-0.5 text-xs text-mute">Written on sync. One per case and topic, at most every 7 days.</p>
-          {[["Harold, new drawings", "after 7 days"], ["Final Acceptance Letter", "after 7 days"], ["The PA, amendment notice", "after 21 days"], ["Estimating, missing scope file", "once"], ["Weekly summary", "every 6 days"]].map(([a, b]) => (
+          {[["Harold, new drawings", "after 7 days"], ["Final Acceptance Letter", "after 7 days"], ["The PA, amendment notice", "after 21 days"], ["Estimating, missing scope file", "once"], ["Weekly summary", "every 6 days"], ["Leslie, use permit hand-off", "by hand, at PCOC"]].map(([a, b]) => (
             <div key={a} className="flex justify-between gap-3 border-t border-[#eef1f6] py-2"><span>{a}</span><b>{b}</b></div>
           ))}
           <div className="kpi-label mt-4">Settings in Quickbase</div>
-          {[["PCOC Mail Mode", set.mode], ["Emails held", set.held], ["Amendment requests to", set.to], ["Harold", set.harold], ["Sign sticker to", set.sign], ["Close-out to", set.closeTo], ["FAL requests to", set.falTo], ["Scope file requests to", set.scopeTo]].map(([a, b]) => (
+          {[["PCOC Mail Mode", set.mode], ["Emails held", set.held], ["Amendment requests to", set.to], ["Harold", set.harold], ["Close-out to", set.closeTo], ["Final Acceptance Letter requests (PMs)", set.falTo], ["Scope file requests to", set.scopeTo]].map(([a, b]) => (
             <div key={a} className="flex justify-between gap-3 border-t border-[#eef1f6] py-2"><span>{a}</span><span className="truncate text-right text-mute" title={b}>{b || "not set"}</span></div>
           ))}
           <p className="mt-3 text-xs text-mute">These live in KTO Program Defaults. Releasing held emails is done there, on purpose, not from this app.</p>

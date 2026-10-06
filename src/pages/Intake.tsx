@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Btn, Confirm, Empty, PageTitle, Pill, useAction } from "@/components/ui";
-import { type Case, PC, cases, money, pathOf, rowsOf, rows, us, useEngine } from "@/lib/engine";
+import { type Case, PC, cases, money, msOf, pathOf, rowsOf, rows, us, useEngine } from "@/lib/engine";
 import { cn } from "@/lib/utils";
 
 type ListKey = "recent" | "structure" | "finished" | "refund" | "notreq";
@@ -34,7 +34,7 @@ export default function Intake() {
   return (
     <>
       <PageTitle title="Intake" who="Priscilla" ends="each case is decided: needs an amendment, parked, or not required." />
-      <div className="next">New scope changes come from Canopy by themselves. You only decide. A case moves to <b>1 · Prepare</b> the moment you press <b>Needs an amendment</b>.</div>
+      <div className="next">A case needs an amendment when a scope change changed the <b>construction</b> cost (temporary relocation does not count). New scope changes come from Canopy by themselves: you only decide. Rebuilt houses wait for Structure, then show in <b>1 · Prepare</b> as a heads-up; the work starts at Substantial/Finishes.</div>
 
       <div role="tablist" aria-label="Intake lists" className="flex flex-wrap gap-1.5">
         {LISTS.map((l) => (
@@ -84,7 +84,7 @@ function CaseTable({ list, tab, busy, onDecide }: { list: Case[]; tab: ListKey; 
   if (!list.length) return <Empty>No cases here.</Empty>;
   return (
     <table className="w-full border-collapse">
-      <thead><tr><th className="th">Case</th><th className="th">Scope changes</th><th className="th text-right">Added scope</th><th className="th">Latest approval</th><th className="th">Structure passed</th><th className="th">Decide</th></tr></thead>
+      <thead><tr><th className="th">Case</th><th className="th">Scope changes</th><th className="th text-right">Added scope</th><th className="th">Latest approval</th><th className="th">Structure passed</th><th className="th">Substantial/Finishes</th><th className="th">Decide</th></tr></thead>
       <tbody>
         {list.map((c) => {
           const R = rowsOf(c);
@@ -99,6 +99,7 @@ function CaseTable({ list, tab, busy, onDecide }: { list: Case[]; tab: ListKey; 
               <td className={cn("td text-right font-bold", amt < 0 && "text-bad-ink")}>{amt < 0 ? `${money(Math.abs(amt))} back` : money(amt)}</td>
               <td className="td">{us(appr)}</td>
               <td className="td">{c.fam === "RECON" ? (sp ? <Pill tone="ok">{us(sp)}</Pill> : <Pill tone="wait">not yet</Pill>) : <span className="text-xs text-mute">n/a</span>}</td>
+              <td className="td">{msOf(c).substantial ? <Pill tone="ok">{us(msOf(c).substantial!)}</Pill> : <Pill tone="wait">not yet</Pill>}</td>
               <td className="td">
                 <div className="flex flex-wrap gap-1.5">
                   {tab !== "structure" || sp ? <Btn busy={b} onClick={() => onDecide({ c, kind: "amend", label: "Needs an amendment" })}>Needs an amendment</Btn> : <span className="text-xs text-mute">Moves by itself once Structure passes</span>}

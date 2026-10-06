@@ -67,7 +67,7 @@ function caseByCs(cs){ return G.cases.filter(function(x){return x.cs===cs;})[0];
 PC.caseByRid=caseByRid; PC.caseByCs=caseByCs;
 
 PC.loadAll=function(){
-  return load().then(function(){ return gLoad(); }).then(function(){ return sfLoad(); })
+  return load().then(function(){ return gLoad(); }).then(function(){ return Promise.all([sfLoad(),PC.loadMilestones()]); })
     .then(function(){ PC.loaded=true; emit('change'); });
 };
 PC.reload=function(){ return PC.loadAll(); };
@@ -303,6 +303,111 @@ PC.tripPack=function(rowList){
       return c2.then(function(){ return out.save(); }).then(function(bytes){ emit('change'); return {bytes:bytes,missed:missed}; });
     });
   });
+};
+
+/* ===== Priscilla's flow (call 2026-10-06) =====
+   - the town gets exactly 4 papers: Notification, Final Acceptance Letter,
+     the ORIGINAL tax receipt, our calculation sheet (no estimate, no task order);
+   - drawings are uploaded (they are in Smartsheet already), not requested;
+   - the sign sticker is placed by our inspectors: no vendor email;
+   - work starts at Substantial/Finishes; Structure is the early heads-up;
+   - when the PA issues the PCOC, Leslie starts the use permit. */
+function caseOfRow(r){ return G.cases.filter(function(c){ return c.cs===r.cs; })[0]||null; }
+/* replaces page 177's count, which counted estimate + task order */
+function dofOf(r){ var c=caseOfRow(r), n=0; if(r.d1||r.l1)n++; if(c&&c.fal)n++; if(r.d3||r.l3)n++; if(r.sheet)n++; return n; }
+/* replaces page 177's print-pack contents: the 4 papers the town asks for */
+function ITEMS(r){
+  var c=caseOfRow(r);
+  return [
+    {n:'Notificacion de Enmienda al Permiso', lk:r.l1||'', qb:r.d1?('/up/'+TID+'/a/r'+r.rid+'/e46/v0'):''},
+    {n:'Final Acceptance Letter', lk:'', qb:(c&&c.fal)?('/up/'+CT+'/a/r'+c.rid+'/e24/v0'):''},
+    {n:'Recibo de arbitrios original', lk:r.l3||'', qb:r.d3?('/up/'+TID+'/a/r'+r.rid+'/e48/v0'):''},
+    {n:'Calculo de arbitrios y patentes', lk:'', qb:r.sheet?('/up/'+TID+'/a/r'+r.rid+'/e66/v0'):''}
+  ];
+}
+/* page 177's mailSync() minus the automatic sign-sticker email */
+function mailSync(){
+  var jobs=[];
+  G.cases.forEach(function(c){
+    var inner='';
+    Object.keys(KSTAMP).forEach(function(kind){ var k=KSTAMP[kind], m=lastMail(c,kind);
+      if(m&&m.st==='Sent'&&!c[k]){ c[k]=m.sent||gtoday(); inner+='<field fid="'+CF[k]+'">'+gmdy(c[k])+'</field>'; } });
+    if(inner){ var ns=derive(c); if(ns!==c.stage){ inner+='<field fid="10">'+esc(ns)+'</field><field fid="11">'+gmdy(gtoday())+'</field>'; c.stage=ns; }
+      jobs.push(xml2(CT,'API_EditRecord','<rid>'+c.rid+'</rid>'+inner)); }
+  });
+  return Promise.all(jobs).then(function(){ return jobs.length; });
+}
+
+/* The Final Acceptance Letter is asked of the PMs directly, with a plain
+   email and no attachments (Priscilla, 2026-10-06). Recipient: Settings fid 78. */
+function mFAL(c){
+  var body='Hello,\n\nWe are ready for the construction permit amendment on '+c.cs+'. Please send us the Final Acceptance Letter for the case, so we can pay the municipal taxes.\n\n'
+    +caseHead(c)+'\nThank you,\nByrdson Services, LLC';
+  return qmail(c,KIND.fal,G.set.falTo,'','Final Acceptance Letter - '+c.cs,body,[]);
+}
+
+/* The next things to do, in Priscilla's words: page 177's list, reworded. */
+PC.next=function(c){
+  var m=missing(c)||[], s=stOf(c), out=[];
+  m.forEach(function(t){
+    if(/Mark in Canopy/.test(t)) return;
+    if(/^Press "Email Harold/.test(t)) t='Upload Harold\'s revised drawings (they should already be in Smartsheet).';
+    else if(/^Press "Order the sign sticker"/.test(t)) t='Ask the inspectors to put a sticker with the new permit number on the job sign.';
+    else if(/^Press "Ask for the Final Acceptance Letter"/.test(t)) t='Ask the PMs for the Final Acceptance Letter.';
+    else if(/^Go to the town and pay/.test(t)) t='Go to the town and pay. Put in the date and what they charged.';
+    else if(/in Step 1, box 1\.?$/.test(t)) t=t.replace(/in Step 1, box 1\.?$/,'here (Scope file).');
+    else if(/Amendment closed on/.test(t)) t='When the PA issues the PCOC (final construction permit), put the date in "PCOC issued on".';
+    out.push(t);
+  });
+  if(s&&s.k==='A'&&!c.fal&&!c.falReq) out.push('Ask the PMs for the Final Acceptance Letter now, so it is here when the town needs it.');
+  if(s&&s.k==='C'&&!rowsOf(c).some(function(r){ return r.sheet; })) out.splice(Math.max(0,out.length-1),0,'Build the calculation sheet.');
+  if(s&&s.k==='E'&&!out.length) out.push('When the PA issues the PCOC (final construction permit), put the date in "PCOC issued on".');
+  return out;
+};
+
+/* Canopy milestones from the Jobs table (read only): Structure is the
+   heads-up, Substantial/Finishes is when the amendment work starts. */
+G.ms={};
+function msDate(v){
+  var best=''; String(v||'').replace(/(\d{1,2})\/(\d{1,2})\/(\d{4})/g,function(_,d,m,y){
+    var iso=y+'-'+('0'+m).slice(-2)+'-'+('0'+d).slice(-2); if(iso>best) best=iso; return _; });
+  return best;
+}
+PC.loadMilestones=function(){
+  var seen={}; S.rows.forEach(function(r){ if(r.job) seen[r.job]=1; });
+  var ids=Object.keys(seen), chunks=[];
+  for(var i=0;i<ids.length;i+=60) chunks.push(ids.slice(i,i+60));
+  return Promise.all(chunks.map(function(ch){
+    return xml2('buskqh27b','API_DoQuery','<query>'+ch.map(function(id){ return '{3.EX.'+id+'}'; }).join('OR')+'</query><clist>3.1365.1231.1366.1127</clist><fmt>structured</fmt><options>num-500</options>')
+      .then(function(d){ recs(d).forEach(function(o){
+        var goal=String(o['1127']||'').split(/\n/).filter(Boolean).pop()||'';
+        G.ms[o.rid]={structure:msDate(o['1365']),substantial:msDate(o['1231'])||msDate(o['1366']),goal:goal};
+      }); });
+  })).catch(function(e){ console.warn('milestones',e); });
+};
+PC.msOf=function(c){ var r=rowsOf(c).filter(function(x){ return x.job; })[0]; return (r&&G.ms[r.job])||{}; };
+
+PC.buildSheet=function(rid){
+  var c=caseByRid(rid), r=c&&rowsOf(c)[0]; if(!r) return Promise.reject(new Error('This case has no amendment rows.'));
+  return buildSheet(r).then(function(){ emit('change'); });
+};
+PC.buildPack=function(rid){
+  var c=caseByRid(rid), r=c&&rowsOf(c)[0]; if(!r) return Promise.reject(new Error('This case has no amendment rows.'));
+  return buildPack(r).then(function(res){ emit('change'); return res||{}; });
+};
+
+/* Hand-off to Leslie for the use permit, through the Outbox like every other email. */
+var HANDOFF='PCOC Use Permit Handoff';
+PC.handoffKind=HANDOFF;
+PC.handoff=function(rid,to){
+  var c=caseByRid(rid); if(!c) return Promise.reject(new Error('Case not found.'));
+  if(!to) return Promise.reject(new Error('Type Leslie\'s email first.'));
+  var r1=rowsOf(c).filter(function(r){ return r.d1; })[0];
+  var body='Hi Leslie,\n\nThe permit amendment for '+c.cs+' is done. The PA issued the PCOC'+(c.closed?' on '+us(c.closed):'')+', so the use permit can start.\n\n'
+    +caseHead(c)+(c.pcoc?'New permit number (PCOC): '+c.pcoc+'\n':'')+(c.paid?'Amendment taxes paid: '+us(c.paid)+'\n':'')
+    +'\nThe papers are in the case folder in Drive (05 Permits / Amendment).\n\nThank you,\nByrdson Services PCOC team';
+  return qmail(c,HANDOFF,to,'','PCOC listo, puede empezar el permiso de uso - '+c.cs,body,[r1?qurl(TID,r1.rid,46):null].filter(Boolean))
+    .then(function(st){ emit('change'); return st; });
 };
 
 PC.view=function(u,title){ return viewFile(u,title); };

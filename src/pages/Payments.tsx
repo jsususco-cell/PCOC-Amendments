@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { X } from "lucide-react";
 import { Btn, EDGE, Empty, Kpi, PageTitle, Pill, useAction } from "@/components/ui";
-import { type Row, PC, money, owes, rowFile, rows, us, useEngine, view } from "@/lib/engine";
+import { type Row, PC, fname, money, owes, rowFile, rows, us, useEngine, view } from "@/lib/engine";
 import { cn } from "@/lib/utils";
 
 const PMETH = ["", "Credit Card", "Company Check", "Cashier's Check", "ACH / Wire", "Cash", "Money Order", "Paid by PA / Expediter"];
@@ -121,7 +121,7 @@ function PayPanel({ r, onClose }: { r: Row; onClose: () => void }) {
       {charged > 0 && (Math.abs(charged - due) < 0.005 ? <Pill tone="ok">Matches our figure</Pill> : <Pill tone="wait">We expected {money(due)}</Pill>)}
       <div className="kpi-label">Receipt and job cost</div>
       <div className="text-[13px]">
-        Receipt: {r.rcpt ? <button className="font-semibold text-navy underline" onClick={() => view(rowFile(r, 38), `Receipt - ${r.cs}`)}>{r.rcpt}</button> : <span className="text-mute">none on file</span>}
+        Receipt: {r.rcpt ? <button className="font-semibold text-navy underline" onClick={() => view(rowFile(r, 38), `Receipt - ${r.cs}`)}>{fname(r.rcpt)}</button> : <span className="text-mute">none on file</span>}
         <input type="file" accept=".pdf,image/*" className="mt-1 block text-xs" onChange={(e) => setRcpt(e.target.files?.[0] ?? null)} />
       </div>
       <div className="text-[13px]">{r.jcref ? <>Job cost posted as <b>{r.jcref}</b>, coded to Permits/blueprints/surveys-PR.</> : "Job cost posts itself once the amount, how it was paid and the payment date are in."}</div>
