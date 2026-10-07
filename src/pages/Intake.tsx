@@ -21,14 +21,14 @@ export default function Intake() {
 
   const prepare = (c: Case) => nav("/prepare?case=" + encodeURIComponent(c.cs));
   const decide = (d: Decision) => run("d" + d.c.rid, () => PC().decide(d.c.rid, d.kind).then(() => { if (d.kind === "amend") prepare(d.c); }), `${d.c.cs}: ${d.label}.`);
-  const start = (c: Case) => c.stage === "A · Prepare request" ? prepare(c) : setAsk({ c, kind: "amend", label: "Start 1 · Prepare" });
+  const start = (c: Case) => setAsk({ c, kind: "amend", label: "Start 1 · Prepare" });
 
   return (
     <>
       <PageTitle title="Intake" who="Priscilla" ends="each new scope change is started in 1 · Prepare, or marked not required." />
       <div className="next">
         New scope changes come in every morning from Canopy (approved after the permit, construction cost only; temporary relocation does not count).
-        A case stays here until its Step 1 work begins: papers built, scope file checked, drawings or the FAL requested.
+        A case leaves Intake when you move it to 1 · Prepare or mark it not required.
         Rebuilt houses whose Structure inspection has not passed are left out ({cases().filter(structurePending).length} now); they come in once it passes.
       </div>
 

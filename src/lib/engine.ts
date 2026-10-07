@@ -99,8 +99,8 @@ export const pathOf = (c: Case): string => {
 export const started = (c: Case): boolean =>
   !!(c.narr || c.estChk || c.drwReq || c.drwRec || c.falReq || c.scopeReq || c.sentPA || rowsOf(c).some((r) => r.estOn));
 
-/** Intake: cases with new scope changes where 1 · Prepare has not started yet. Newest approval first. */
-export const INTAKE_FROM = ["A · Prepare request", "Waiting · Structure not passed", "Finished · confirm with Priscilla", "Refund owed to us"];
+/** Intake: cases with new scope changes not yet moved to 1 · Prepare. Moving one there takes it off Intake. Newest approval first. */
+export const INTAKE_FROM = ["Waiting · Structure not passed", "Finished · confirm with Priscilla", "Refund owed to us"];
 /** Rebuilt house whose Structure inspection has not passed: not in Intake until it does. */
 export const structurePending = (c: Case): boolean =>
   c.stage === "Waiting · Structure not passed" && !rowsOf(c).some((r) => r.sp);
