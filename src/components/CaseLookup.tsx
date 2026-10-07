@@ -92,5 +92,3 @@ export function FromBanner({ c, stepKey, children }: { c: Case; stepKey: string;
     </div>
   );
 }
-
-export const INTAKE_STAGES = ["Waiting · Structure not passed", "Finished · confirm with Priscilla", "Refund owed to us", "Not required"];

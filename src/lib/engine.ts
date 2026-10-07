@@ -95,7 +95,18 @@ export const pathOf = (c: Case): string => {
   return "/intake?case=" + encodeURIComponent(c.cs);
 };
 
-export const sumRows = (c: Case, f: (r: Row) => number) => rowsOf(c).reduce((t, r) => t + (f(r) || 0), 0);
+/** Step 1 has begun once any of its work is on the case (papers, requests, the scope check). */
+export const started = (c: Case): boolean =>
+  !!(c.narr || c.estChk || c.drwReq || c.drwRec || c.falReq || c.scopeReq || c.sentPA || rowsOf(c).some((r) => r.estOn));
+
+/** Intake: cases with new scope changes where 1 · Prepare has not started yet. Newest approval first. */
+export const INTAKE_FROM = ["A · Prepare request", "Waiting · Structure not passed", "Finished · confirm with Priscilla", "Refund owed to us"];
+export const latestAppr = (c: Case): string => rowsOf(c).map((r) => r.appr).sort().pop() ?? "";
+export const intakeCases = (): Case[] =>
+  cases().filter((c) => INTAKE_FROM.includes(c.stage) && rowsOf(c).length && !started(c))
+    .sort((a, b) => latestAppr(b).localeCompare(latestAppr(a)));
+
+export const sumRows =(c: Case, f: (r: Row) => number) => rowsOf(c).reduce((t, r) => t + (f(r) || 0), 0);
 
 /** A file field from the money rows reads as "name.pdfhttps://…": keep the name. */
 export const fname = (v: string | undefined): string => String(v || "").split(/https?:\/\//)[0];

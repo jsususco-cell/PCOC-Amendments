@@ -2,11 +2,11 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Eye, FileText, Mail, Send, Sparkles } from "lucide-react";
 import { ActionBar, Btn, DateField, DocRow, EDGE, FileBtn, HeldBanner, Kpi, NextBox, PageTitle, Pill, TextField, useAction } from "@/components/ui";
-import CaseLookup, { FromBanner, INTAKE_STAGES } from "@/components/CaseLookup";
+import CaseLookup, { FromBanner } from "@/components/CaseLookup";
 import CaseHead from "@/components/CaseHead";
 import ScopePreview from "@/components/ScopePreview";
 import MailNote, { mailToast } from "@/components/MailNote";
-import { type Case, PC, W, caseFile, cases, daysOf, downloadUrl, have, inStep, limitOf, mailLive, missing, money, msOf, rowFile, rowsOf, todayIso, us, useEngine, view } from "@/lib/engine";
+import { type Case, PC, W, caseFile, cases, daysOf, downloadUrl, have, inStep, intakeCases, limitOf, mailLive, missing, money, msOf, rowFile, rowsOf, todayIso, us, useEngine, view } from "@/lib/engine";
 import { useSelectedCase } from "@/lib/useCase";
 
 export default function Prepare() {
@@ -29,7 +29,7 @@ export default function Prepare() {
       </div>
       {!mailLive() && <HeldBanner />}
       <CaseLookup queue={queue} selected={c} onPick={pick} stepKey="A"
-        from={{ label: "Intake", list: cases().filter((x) => INTAKE_STAGES.includes(x.stage)).sort((a, b) => daysOf(b) - daysOf(a)) }} />
+        from={{ label: "Intake: new scope changes", list: intakeCases().filter((x) => x.stage !== "A · Prepare request") }} />
       {c ? <PrepareCase key={c.rid} c={c} /> : null}
     </>
   );

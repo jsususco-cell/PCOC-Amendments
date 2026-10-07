@@ -1,7 +1,7 @@
 import { ChevronRight, FileCheck2, Loader2 } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { PARKED, STEPS, cases, inStep, useEngine } from "@/lib/engine";
+import { STEPS, cases, inStep, intakeCases, useEngine } from "@/lib/engine";
 
 const TOOLS = [
   { to: "/trips", label: "Trips" },
@@ -14,10 +14,10 @@ const TOOLS = [
 export default function Header({ busy, onSignOut, user }: { busy: string; onSignOut: () => void; user: { email: string; name: string; picture?: string } | null }) {
   useEngine();
   const all = cases();
-  const parked = all.filter((c) => PARKED.includes(c.stage)).length;
+  const fresh = intakeCases().length;
   const rail = [
     { to: "/", label: "Board", n: "", count: all.length },
-    { to: "/intake", label: "Intake", n: "", count: parked },
+    { to: "/intake", label: "Intake", n: "", count: fresh },
     ...STEPS.map((s) => ({ to: s.path, label: s.label, n: s.num, count: inStep(s.k).length })),
   ];
 
