@@ -101,9 +101,12 @@ export const started = (c: Case): boolean =>
 
 /** Intake: cases with new scope changes where 1 · Prepare has not started yet. Newest approval first. */
 export const INTAKE_FROM = ["A · Prepare request", "Waiting · Structure not passed", "Finished · confirm with Priscilla", "Refund owed to us"];
-export const latestAppr = (c: Case): string => rowsOf(c).map((r) => r.appr).sort().pop() ?? "";
+/** Rebuilt house whose Structure inspection has not passed: not in Intake until it does. */
+export const structurePending = (c: Case): boolean =>
+  c.stage === "Waiting · Structure not passed" && !rowsOf(c).some((r) => r.sp);
+export const latestAppr =(c: Case): string => rowsOf(c).map((r) => r.appr).sort().pop() ?? "";
 export const intakeCases = (): Case[] =>
-  cases().filter((c) => INTAKE_FROM.includes(c.stage) && rowsOf(c).length && !started(c))
+  cases().filter((c) => INTAKE_FROM.includes(c.stage) && rowsOf(c).length && !started(c) && !structurePending(c))
     .sort((a, b) => latestAppr(b).localeCompare(latestAppr(a)));
 
 export const sumRows =(c: Case, f: (r: Row) => number) => rowsOf(c).reduce((t, r) => t + (f(r) || 0), 0);

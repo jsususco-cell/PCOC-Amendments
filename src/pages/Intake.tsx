@@ -1,13 +1,13 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Btn, Confirm, Empty, PageTitle, Pill, useAction } from "@/components/ui";
-import { type Case, PC, intakeCases, latestAppr, money, msOf, rowsOf, us, useEngine } from "@/lib/engine";
+import { type Case, PC, cases, intakeCases, structurePending, latestAppr, money, msOf, rowsOf, us, useEngine } from "@/lib/engine";
 import { cn } from "@/lib/utils";
 
 type Decision = { c: Case; kind: "amend" | "notreq"; label: string };
 
 const PARKED_PILL: Record<string, { tone: "wait" | "bad" | "grey"; text: string }> = {
-  "Waiting · Structure not passed": { tone: "wait", text: "Structure not passed" },
+  "Waiting · Structure not passed": { tone: "grey", text: "Structure passed" },
   "Finished · confirm with Priscilla": { tone: "wait", text: "House finished" },
   "Refund owed to us": { tone: "bad", text: "Cost went down" },
 };
@@ -29,6 +29,7 @@ export default function Intake() {
       <div className="next">
         New scope changes come in every morning from Canopy (approved after the permit, construction cost only; temporary relocation does not count).
         A case stays here until its Step 1 work begins: papers built, scope file checked, drawings or the FAL requested.
+        Rebuilt houses whose Structure inspection has not passed are left out ({cases().filter(structurePending).length} now); they come in once it passes.
       </div>
 
       <section className="card overflow-x-auto">
@@ -49,7 +50,6 @@ export default function Intake() {
                 const sp = R.find((r) => r.sp)?.sp ?? "";
                 const sub = msOf(c).substantial;
                 const p = PARKED_PILL[c.stage];
-                const waiting = c.stage === "Waiting · Structure not passed" && !sp;
                 const b = busy === "d" + c.rid;
                 return (
                   <tr key={c.rid}>
@@ -63,9 +63,7 @@ export default function Intake() {
                     </td>
                     <td className="td">
                       <div className="flex flex-wrap gap-1.5">
-                        {waiting
-                          ? <span className="text-xs text-mute">Starts by itself once Structure passes</span>
-                          : <Btn busy={b} onClick={() => start(c)}>Start 1 · Prepare</Btn>}
+                        <Btn busy={b} onClick={() => start(c)}>Start 1 · Prepare</Btn>
                         <Btn kind="outline" busy={b} onClick={() => setAsk({ c, kind: "notreq", label: "Not required" })}>Not required</Btn>
                       </div>
                     </td>
