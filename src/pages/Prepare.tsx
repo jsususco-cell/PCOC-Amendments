@@ -6,7 +6,7 @@ import CaseLookup, { FromBanner } from "@/components/CaseLookup";
 import CaseHead from "@/components/CaseHead";
 import ScopePreview from "@/components/ScopePreview";
 import MailNote, { mailToast } from "@/components/MailNote";
-import { type Case, PC, W, caseFile, cases, daysOf, downloadUrl, have, inStep, intakeCases, limitOf, mailLive, missing, money, msOf, rowFile, rowsOf, todayIso, us, useEngine, view } from "@/lib/engine";
+import { type Case, PC, W, caseFile, cases, canStart, daysOf, downloadUrl, have, inStep, intakeCases, noteSave, noteText, limitOf, mailLive, missing, money, msOf, rowFile, rowsOf, todayIso, us, useEngine, view } from "@/lib/engine";
 import { useSelectedCase } from "@/lib/useCase";
 
 export default function Prepare() {
@@ -20,7 +20,7 @@ export default function Prepare() {
   return (
     <>
       <PageTitle title="1 · Prepare" who="Priscilla" ends="the 3 papers (Project Narrative, Cost Estimate, Harold's revised drawings) are sent to the PA." />
-      <p className="-mt-3 text-[13px] text-mute">A case shows up here when Structure passes, as a heads-up. The work starts at the Substantial/Finishes inspection.</p>
+      <p className="-mt-3 text-[13px] text-mute">A case comes here when Start 1 · Prepare is pressed in Intake: the construction cost went up and the Substantial/Finishes inspection passed.</p>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Kpi label="In this step" value={queue.length} sub={`limit ${limitOf("A")} days`} edge={EDGE.navy} />
         <Kpi label="Oldest" value={oldest ? `${daysOf(oldest)} days` : "—"} sub={oldest?.cs ?? "nothing waiting"} edge={EDGE.amber} />
@@ -29,7 +29,7 @@ export default function Prepare() {
       </div>
       {!mailLive() && <HeldBanner />}
       <CaseLookup queue={queue} selected={c} onPick={pick} stepKey="A"
-        from={{ label: "Intake: new scope changes", list: intakeCases().filter((x) => x.stage !== "A · Prepare request") }} />
+        from={{ label: "Intake: new scope changes", list: intakeCases() }} />
       {c ? <PrepareCase key={c.rid} c={c} /> : null}
     </>
   );
@@ -61,7 +61,7 @@ function PrepareCase({ c }: { c: Case }) {
   const helperNarr = !!narBy;
   const [txt, setTxt] = useState<Record<string, string>>(() => ({
     addr: c.addr || R[0]?.addr || "", exSf: c.exSf, lot: c.lot, model: c.model, newSf: c.newSf, aps: c.aps,
-    chg: c.chg, oNarr: c.oNarr, oEst: c.oEst, note: c.note,
+    chg: c.chg, oNarr: c.oNarr, oEst: c.oEst, note: noteText(c),
   }));
   const [sentPA, setSentPA] = useState(c.sentPA);
   const set = (k: string) => (v: string) => setTxt((t) => ({ ...t, [k]: v }));
@@ -94,7 +94,7 @@ function PrepareCase({ c }: { c: Case }) {
       {preview && <ScopePreview c={c} onClose={() => setPreview(false)} />}
       <CaseHead c={c} right={<p className="mt-1.5 text-sm"><b>{3 - need.length}</b> <span className="text-xs text-mute">of 3 papers ready</span></p>} />
       <FromBanner c={c} stepKey="A">
-        <Btn busy={busy === "move"} onClick={() => run("move", () => PC().decide(c.rid, "amend"), `${c.cs} moved to 1 · Prepare.`)}>Move to 1 · Prepare</Btn>
+        {canStart(c).ok ? <Btn busy={busy === "move"} onClick={() => run("move", () => PC().start(c.rid), `${c.cs} moved to 1 · Prepare.`)}>Move to 1 · Prepare</Btn> : <span className="text-xs text-mute">Cannot start yet: {canStart(c).why}</span>}
         <span className="text-xs text-mute">It needs an amendment: the work starts here.</span>
       </FromBanner>
       {m[0] && <div className="mx-5 mb-3.5"><NextBox>{m[0]}</NextBox></div>}
@@ -190,7 +190,7 @@ function PrepareCase({ c }: { c: Case }) {
 
       <ActionBar note={<>Sending moves this case to <b>2 · With the PA</b> once the email has gone out, or when "Sent to the PA on" has a date.</>}>
         <Btn kind="go" busy={busy === "mpa"} disabled={need.length > 0} onClick={() => mail("pa")}><Send className="h-4 w-4" />Send the 3 papers to the PA</Btn>
-        <Btn kind="outline" busy={busy === "save"} onClick={() => save({ dates: { sentPA }, texts: { note: txt.note } })}>Save</Btn>
+        <Btn kind="outline" busy={busy === "save"} onClick={() => save({ dates: { sentPA }, texts: { note: noteSave(c, txt.note || "") } })}>Save</Btn>
         <span className="text-[13px]">{need.length ? <>Still needed: <b>{need.join(", ")}</b>.</> : <MailNote c={c} kind="pa" />}</span>
       </ActionBar>
     </section>

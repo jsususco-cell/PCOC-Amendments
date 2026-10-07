@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Btn, Confirm, Empty, PageTitle, Pill, useAction } from "@/components/ui";
-import { type Case, PC, cases, intakeCases, structurePending, latestAppr, money, msOf, rowsOf, us, useEngine } from "@/lib/engine";
+import { type Case, PC, canStart, cases, intakeCases, structurePending, latestAppr, money, msOf, rowsOf, us, useEngine } from "@/lib/engine";
 import { cn } from "@/lib/utils";
 
 type Decision = { c: Case; kind: "amend" | "notreq"; label: string };
@@ -17,10 +17,12 @@ export default function Intake() {
   const nav = useNavigate();
   const [ask, setAsk] = useState<Decision | null>(null);
   const { busy, run } = useAction();
-  const list = intakeCases();
+  const all = intakeCases();
+  const list = [...all.filter((c) => canStart(c).ok), ...all.filter((c) => !canStart(c).ok)];
+  const ready = all.filter((c) => canStart(c).ok).length;
 
   const prepare = (c: Case) => nav("/prepare?case=" + encodeURIComponent(c.cs));
-  const decide = (d: Decision) => run("d" + d.c.rid, () => PC().decide(d.c.rid, d.kind).then(() => { if (d.kind === "amend") prepare(d.c); }), `${d.c.cs}: ${d.label}.`);
+  const decide = (d: Decision) => run("d" + d.c.rid, () => (d.kind === "amend" ? PC().start(d.c.rid) : PC().decide(d.c.rid, d.kind)).then(() => { if (d.kind === "amend") prepare(d.c); }), `${d.c.cs}: ${d.label}.`);
   const start = (c: Case) => setAsk({ c, kind: "amend", label: "Start 1 · Prepare" });
 
   return (
@@ -28,7 +30,7 @@ export default function Intake() {
       <PageTitle title="Intake" who="Priscilla" ends="each new scope change is started in 1 · Prepare, or marked not required." />
       <div className="next">
         New scope changes come in every morning from Canopy (approved after the permit, construction cost only; temporary relocation does not count).
-        A case leaves Intake when you move it to 1 · Prepare or mark it not required.
+        {" "}<b>Start 1 · Prepare</b> opens only when the construction cost went <b>up</b>, the Structure inspection passed (rebuilt houses) and the <b>Substantial/Finishes</b> inspection passed. A case leaves Intake when it is started or marked not required.
         Rebuilt houses whose Structure inspection has not passed are left out ({cases().filter(structurePending).length} now); they come in once it passes.
       </div>
 
@@ -36,9 +38,9 @@ export default function Intake() {
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-3.5">
           <div>
             <h2 className="m-0 text-base font-bold">New scope changes</h2>
-            <div className="text-xs text-mute">Newest approval first.</div>
+            <div className="text-xs text-mute">Ready to start first, then newest approval.</div>
           </div>
-          <Pill tone={list.length ? "navy" : "ok"}>{list.length} case{list.length === 1 ? "" : "s"}</Pill>
+          <div className="flex gap-1.5"><Pill tone="ok">{ready} ready to start</Pill><Pill tone={list.length ? "navy" : "ok"}>{list.length} case{list.length === 1 ? "" : "s"}</Pill></div>
         </div>
         {!list.length ? <Empty>No new scope changes. Everything is in a step already.</Empty> : (
           <table className="w-full border-collapse">
@@ -47,7 +49,8 @@ export default function Intake() {
               {list.map((c) => {
                 const R = rowsOf(c);
                 const amt = R.reduce((t, r) => t + (r.amt || 0), 0);
-                const sp = R.find((r) => r.sp)?.sp ?? "";
+                const sp = R.find((r) => r.sp)?.sp ?? msOf(c).structure ?? "";
+                const go = canStart(c);
                 const sub = msOf(c).substantial;
                 const p = PARKED_PILL[c.stage];
                 const b = busy === "d" + c.rid;
@@ -63,7 +66,7 @@ export default function Intake() {
                     </td>
                     <td className="td">
                       <div className="flex flex-wrap gap-1.5">
-                        <Btn busy={b} onClick={() => start(c)}>Start 1 · Prepare</Btn>
+                        {go.ok ? <Btn busy={b} onClick={() => start(c)}>Start 1 · Prepare</Btn> : <span className="max-w-[15rem] text-xs text-mute">{go.why}</span>}
                         <Btn kind="outline" busy={b} onClick={() => setAsk({ c, kind: "notreq", label: "Not required" })}>Not required</Btn>
                       </div>
                     </td>
@@ -76,7 +79,7 @@ export default function Intake() {
       </section>
 
       <Confirm open={!!ask} title={ask ? `${ask.c.cs}: ${ask.label}?` : ""} action={ask?.label ?? ""}
-        body={ask && <>This sets every open scope change on <b>{ask.c.cs}</b> ({rowsOf(ask.c).length}) and the case itself. {ask.kind === "amend" ? "The case moves to 1 · Prepare." : "It leaves Intake."}</>}
+        body={ask && <>This sets every open scope change on <b>{ask.c.cs}</b> ({rowsOf(ask.c).length}) and the case itself. {ask.kind === "amend" ? "The case moves to 1 · Prepare, and its Stage Note gets a dated “Started 1 · Prepare” line." : "It leaves Intake."}</>}
         onCancel={() => setAsk(null)} onOk={() => { const d = ask!; setAsk(null); decide(d); }} />
     </>
   );

@@ -511,3 +511,44 @@ PC.STAGE_LIMIT={A:14,B:21,C:14,D:10,E:30};
 
 window.PCOC=PC;
 window.G=G;
+
+/* ---------- Intake rule (no table changes) ----------
+   A case at "A · Prepare request" is still in INTAKE until someone presses
+   Start 1 · Prepare. Start writes a dated first line into the case's Stage
+   Note (fid 43); the rest of the note stays the team's own text. A case that
+   already has Step 1 work on it counts as started too.
+   Start is allowed only when the construction cost went UP, Structure passed
+   (rebuilt houses) and Substantial/Finishes passed. */
+var INTAKE_MARK=/^Started 1 \u00b7 Prepare on [^\n]*\n?/m;
+var INTAKE_STG={k:'I',n:'Intake',l:'Intake',h:'Priscilla',d:'New scope change: decide whether to start 1 \u00b7 Prepare.'};
+PC.markOf=function(c){ var m=String(c.note||'').match(INTAKE_MARK); return m?m[0].trim():''; };
+PC.noteText=function(c){ return String(c.note||'').replace(INTAKE_MARK,'').replace(/^\n+/,''); };
+PC.noteSave=function(c,txt){ var m=PC.markOf(c); return m?(m+(txt?'\n'+txt:'')):(txt||''); };
+function stepWork(c){ return !!(c.narr||c.estChk||c.drwReq||c.drwRec||c.falReq||c.scopeReq||c.sentPA||rowsOf(c).some(function(r){ return r.estOn; })); }
+function amtOf(c){ return rowsOf(c).reduce(function(t,r){ return t+(Number(r.amt)||0); },0); }
+function structOk(c){ return rowsOf(c).some(function(r){ return r.sp; })||!!PC.msOf(c).structure; }
+PC.isIntake=function(c){
+  if(!rowsOf(c).length) return false;
+  if(c.stage==='A \u00b7 Prepare request') return !PC.markOf(c)&&!stepWork(c);
+  if(c.stage==='Refund owed to us'||c.stage==='Finished \u00b7 confirm with Priscilla') return true;
+  if(c.stage==='Waiting \u00b7 Structure not passed') return structOk(c);
+  return false;
+};
+PC.canStart=function(c){
+  var a=amtOf(c);
+  if(a<0) return {ok:false,why:'Cost went down. Refunds need their own path (not decided yet).'};
+  if(Math.abs(a)<0.005) return {ok:false,why:'No cost change. Mark it Not required.'};
+  if(c.fam==='RECON'&&!structOk(c)) return {ok:false,why:'Waiting for Structure.'};
+  if(!PC.msOf(c).substantial) return {ok:false,why:'Waiting for Substantial/Finishes.'};
+  return {ok:true,why:''};
+};
+PC.start=function(rid){
+  var c=caseByRid(rid); if(!c) return Promise.reject(new Error('Case not found.'));
+  var q=PC.canStart(c); if(!q.ok) return Promise.reject(new Error(q.why));
+  var rest=PC.noteText(c), note='Started 1 \u00b7 Prepare on '+us(gtoday())+'.'+(rest?'\n'+rest:'');
+  return xml2(CT,'API_EditRecord','<rid>'+c.rid+'</rid><field fid="43">'+esc(note)+'</field>')
+    .then(function(){ c.note=note; return PC.decide(rid,'amend'); });
+};
+/* An unstarted Step 1 case reads as Intake everywhere, so the Step 1
+   automations (scope request email, auto-built papers) leave it alone. */
+function stOf(c){ var s=window.__p177.stOf(c); return (s&&s.k==='A'&&PC.isIntake(c))?INTAKE_STG:s; }

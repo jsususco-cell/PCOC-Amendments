@@ -85,29 +85,28 @@ export const limitOf = (k: string): number => PC().STAGE_LIMIT[k] ?? 30;
 export const daysOf = (c: Case): number => Number(c.days) || 0;
 export const overdue = (c: Case): boolean => {
   const s = stageOf(c);
-  return !!s && s.k !== "X" && daysOf(c) > limitOf(s.k);
+  return !!s && s.k !== "X" && s.k !== "I" && daysOf(c) > limitOf(s.k);
 };
 export const inStep = (k: string): Case[] =>
   cases().filter((c) => stageOf(c)?.k === k).sort((a, b) => daysOf(b) - daysOf(a));
 export const pathOf = (c: Case): string => {
   const s = stageOf(c);
-  if (s && s.k !== "X") return STEPS.find((x) => x.k === s.k)!.path + "?case=" + encodeURIComponent(c.cs);
+  if (s && s.k !== "X" && s.k !== "I") return STEPS.find((x) => x.k === s.k)!.path + "?case=" + encodeURIComponent(c.cs);
   return "/intake?case=" + encodeURIComponent(c.cs);
 };
 
-/** Step 1 has begun once any of its work is on the case (papers, requests, the scope check). */
-export const started = (c: Case): boolean =>
-  !!(c.narr || c.estChk || c.drwReq || c.drwRec || c.falReq || c.scopeReq || c.sentPA || rowsOf(c).some((r) => r.estOn));
-
-/** Intake: cases with new scope changes not yet moved to 1 · Prepare. Moving one there takes it off Intake. Newest approval first. */
-export const INTAKE_FROM = ["Waiting · Structure not passed", "Finished · confirm with Priscilla", "Refund owed to us"];
+/** Intake (engine-app PC.isIntake): new scope changes nobody has started yet, incl. Step 1 cases with no Start mark. */
+export const isIntake = (c: Case): boolean => !!PC().isIntake(c);
+/** Whether Start 1 · Prepare is allowed: cost went up, Structure (rebuilt houses) and Substantial passed. */
+export const canStart = (c: Case): { ok: boolean; why: string } => PC().canStart(c);
+/** Stage Note without the Start mark, and the note to save with the mark kept. */
+export const noteText = (c: Case): string => PC().noteText(c);
+export const noteSave = (c: Case, txt: string): string => PC().noteSave(c, txt);
 /** Rebuilt house whose Structure inspection has not passed: not in Intake until it does. */
-export const structurePending = (c: Case): boolean =>
-  c.stage === "Waiting · Structure not passed" && !rowsOf(c).some((r) => r.sp);
-export const latestAppr =(c: Case): string => rowsOf(c).map((r) => r.appr).sort().pop() ?? "";
+export const structurePending = (c: Case): boolean => c.stage === "Waiting · Structure not passed" && !isIntake(c);
+export const latestAppr = (c: Case): string => rowsOf(c).map((r) => r.appr).sort().pop() ?? "";
 export const intakeCases = (): Case[] =>
-  cases().filter((c) => INTAKE_FROM.includes(c.stage) && rowsOf(c).length && !started(c) && !structurePending(c))
-    .sort((a, b) => latestAppr(b).localeCompare(latestAppr(a)));
+  cases().filter(isIntake).sort((a, b) => latestAppr(b).localeCompare(latestAppr(a)));
 
 export const sumRows =(c: Case, f: (r: Row) => number) => rowsOf(c).reduce((t, r) => t + (f(r) || 0), 0);
 

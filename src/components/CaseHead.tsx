@@ -27,7 +27,7 @@ export default function CaseHead({ c, right }: { c: Case; right?: React.ReactNod
       </div>
       <div className="text-right">
         <Pill tone={late ? "bad" : daysOf(c) > limitOf(s?.k ?? "A") / 2 ? "wait" : "grey"}>
-          {s && s.k !== "X" ? `Step ${"ABCDE".indexOf(s.k) + 1}` : c.stage} · {daysOf(c)} days
+          {s?.k === "I" ? "Intake" : s && s.k !== "X" ? `Step ${"ABCDE".indexOf(s.k) + 1}` : c.stage} · {daysOf(c)} days
         </Pill>
         {right}
         <div className="mt-1">

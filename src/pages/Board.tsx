@@ -11,7 +11,7 @@ export default function Board() {
   const [q, setQ] = useState("");
   const [msg, setMsg] = useState("");
   const all = cases();
-  const work = all.filter((c) => { const s = stageOf(c); return s && s.k !== "X"; });
+  const work = all.filter((c) => { const s = stageOf(c); return s && s.k !== "X" && s.k !== "I"; });
   const late = work.filter(overdue).sort((a, b) => daysOf(b) - limitOf(stageOf(b)!.k) - (daysOf(a) - limitOf(stageOf(a)!.k)));
   const parked = all.filter((c) => PARKED.includes(c.stage));
   const closed = all.filter((c) => c.stage === "Closed").length;

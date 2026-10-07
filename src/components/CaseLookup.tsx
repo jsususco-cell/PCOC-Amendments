@@ -87,7 +87,7 @@ export function FromBanner({ c, stepKey, children }: { c: Case; stepKey: string;
   if (s && s.k === stepKey) return null;
   return (
     <div className="mx-5 mb-3.5 flex flex-wrap items-center gap-3 rounded-[10px] border border-[#bfdbfe] bg-[#eff6ff] px-3.5 py-2.5 text-sm">
-      <span>This case is still at <b>{c.stage}</b>.</span>
+      <span>This case is still {s?.k === "I" ? <b>in Intake</b> : <>at <b>{c.stage}</b></>}.</span>
       {children}
     </div>
   );
