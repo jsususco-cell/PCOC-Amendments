@@ -1,12 +1,12 @@
 import React from "react";
 import { Pill } from "./ui";
-import { type Case, daysOf, limitOf, money, msOf, overdue, rowsOf, stageOf, us } from "@/lib/engine";
+import { type Case, caseAmt, daysOf, limitOf, money, msOf, overdue, rowsOf, stageOf, us } from "@/lib/engine";
 
 /** The top of a case card: number, who/where, money, step pill, Drive folder. */
 export default function CaseHead({ c, right }: { c: Case; right?: React.ReactNode }) {
   const R = rowsOf(c);
   const r0 = R[0];
-  const added = R.reduce((t, r) => t + (r.amt || 0), 0);
+  const added = caseAmt(c);
   const s = stageOf(c);
   const late = overdue(c);
   return (

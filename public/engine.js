@@ -944,17 +944,17 @@ function buildLetter(r){
 
         para('  Municipio: '+(r.muni||'')); nl(4);
 
-        para('AUMENTO EN EL COSTO DE LA OBRA');
+        para(r.amt<0?'REDUCCION EN EL COSTO DE LA OBRA':'AUMENTO EN EL COSTO DE LA OBRA');
 
         para('  Costo permitido originalmente: '+money(r.atpermit||0));
 
         para('  Costo revisado: '+money(r.connow||0));
 
-        para('  Aumento: '+money(r.amt));
+        para((r.amt<0?'  Reduccion: ':'  Aumento: ')+money(Math.abs(r.amt)));
 
-        para('  Arbitrios sobre el aumento ('+(r.rate||0)+'%): '+money(r.adue));
+        para('  Arbitrios sobre '+(r.amt<0?'la reduccion, a reembolsar':'el aumento')+' ('+(r.rate||0)+'%): '+money(Math.abs(r.adue)));
 
-        if(r.pdue>0) para('  Patente sobre el aumento ('+(r.prate||0)+'%): '+money(r.pdue));
+        if(r.pdue) para('  Patente sobre '+(r.amt<0?'la reduccion, a reembolsar':'el aumento')+' ('+(r.prate||0)+'%): '+money(Math.abs(r.pdue)));
 
         nl(6);
 
@@ -1110,7 +1110,7 @@ function buildSheet(r){
 
         row('Costo de proyecto revisado',money(r.connow),9.5);
 
-        row('Aumento sujeto a enmienda',money(r.amt),10,bold);
+        row(r.amt<0?'Reduccion sujeta a enmienda':'Aumento sujeto a enmienda',money(Math.abs(r.amt)),10,bold);
 
         nl(4);
 
@@ -1124,17 +1124,17 @@ function buildSheet(r){
 
             var w2=reg.widthOfTextAtSize(money(amt),9.5); page.drawText(money(amt),{x:W-M-w2,y:y,size:9.5,font:reg,color:INK}); nl(15); }
 
-          cn('Arbitrios de construccion sobre el aumento',(r.rate||0),r.adue);
+          cn('Arbitrios de construccion sobre '+(r.amt<0?'la reduccion':'el aumento'),(r.rate||0),Math.abs(r.adue));
 
-          if(r.prate>0) cn('Patente de construccion sobre el aumento',(r.prate||0),r.pdue);
+          if(r.prate>0) cn('Patente de construccion sobre '+(r.amt<0?'la reduccion':'el aumento'),(r.prate||0),Math.abs(r.pdue));
 
           rule();
 
-          t(M,'TOTAL A PAGAR',10.5,bold);
+          t(M,r.amt<0?'TOTAL A REEMBOLSAR AL CONTRATISTA':'TOTAL A PAGAR',10.5,bold);
 
-          var wt=bold.widthOfTextAtSize(money(r.adue+r.pdue),10.5);
+          var wt=bold.widthOfTextAtSize(money(Math.abs(r.adue+r.pdue)),10.5);
 
-          page.drawText(money(r.adue+r.pdue),{x:W-M-wt,y:y,size:10.5,font:bold,color:INK}); nl(18);
+          page.drawText(money(Math.abs(r.adue+r.pdue)),{x:W-M-wt,y:y,size:10.5,font:bold,color:INK}); nl(18);
 
         })();
 
@@ -1162,7 +1162,7 @@ function buildSheet(r){
 
             +'permisos, consultoria y servicios legales. El municipio realiza su propio calculo; este documento se provee '
 
-            +'como referencia y desglose del aumento.',reg,8.5,W-2*M).forEach(function(l){ t(M,l,8.5,reg,MUT); nl(11); });
+            +'como referencia y desglose '+(r.amt<0?'de la reduccion y del reembolso.':'del aumento.'),reg,8.5,W-2*M).forEach(function(l){ t(M,l,8.5,reg,MUT); nl(11); });
 
         return doc.saveAsBase64();
 
@@ -1458,11 +1458,11 @@ function buildEstimate(r){
 
         head('BASE SUJETA A ARBITRIOS');
 
-        row2('Aumento en el costo de construccion',money(r.amt));
+        row2(r.amt<0?'Reduccion en el costo de construccion':'Aumento en el costo de construccion',money(Math.abs(r.amt)));
 
-        row2('Arbitrios sobre el aumento ('+(r.rate||0)+'%)',money(r.adue));
+        row2('Arbitrios sobre '+(r.amt<0?'la reduccion':'el aumento')+' ('+(r.rate||0)+'%)',money(Math.abs(r.adue)));
 
-        if(r.prate>0) row2('Patente sobre el aumento ('+(r.prate||0)+'%)',money(r.pdue));
+        if(r.prate>0) row2('Patente sobre '+(r.amt<0?'la reduccion':'el aumento')+' ('+(r.prate||0)+'%)',money(Math.abs(r.pdue)));
 
         nl(4);
 
@@ -3018,9 +3018,9 @@ function mClose(c){
 
   var ev=[c.cert?qurl(CT,c.rid,28):null,rowFile(c,'rcpt',38),c.sign?qurl(CT,c.rid,30):null].filter(Boolean);
 
-  var body='Saludos,\n\nSometemos la evidencia para cerrar la enmienda al permiso del siguiente caso.\n\n'+caseHead(c)+(c.pcoc?'Numero nuevo (PCOC): '+c.pcoc+'\n':'')+(c.paid?'Impuestos pagados: '+us(c.paid)+'\n':'')
+  var body='Saludos,\n\nSometemos la evidencia para cerrar la enmienda al permiso del siguiente caso.\n\n'+caseHead(c)+(c.pcoc?'Numero nuevo (PCOC): '+c.pcoc+'\n':'')+(c.paid?(refundCase(c)?'Reembolso reclamado al municipio: ':'Impuestos pagados: ')+us(c.paid)+'\n':'')
 
-   +'\nAdjuntamos:\n  1. Evidencia del pago de arbitrios y patente\n  2. Foto del rotulo con el numero nuevo del permiso\n\nGracias,\nByrdson Services, LLC';
+   +'\nAdjuntamos:\n  1. '+(refundCase(c)?'Evidencia de la reclamacion de reembolso de arbitrios y patente':'Evidencia del pago de arbitrios y patente')+'\n  2. Foto del rotulo con el numero nuevo del permiso\n\nGracias,\nByrdson Services, LLC';
 
   return qmail(c,KIND.close,G.set.closeTo,G.set.closeCc,'Cierre de enmienda al permiso - '+c.cs,body,ev);
 

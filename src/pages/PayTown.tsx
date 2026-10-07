@@ -5,7 +5,7 @@ import { ActionBar, Btn, DateField, DocRow, EDGE, Empty, FileBtn, HeldBanner, Kp
 import CaseHead from "@/components/CaseHead";
 import { FromBanner } from "@/components/CaseLookup";
 import MailNote, { mailToast } from "@/components/MailNote";
-import { type Case, type Row, PC, caseFile, cases, fname, daysOf, have, inStep, limitOf, mailLive, missing, money, overdue, rowFile, rowsOf, us, useEngine, view } from "@/lib/engine";
+import { type Case, type Row, PC, caseAmt, caseArb, caseFile, casePat, cases, fname, daysOf, have, inStep, isRefund, limitOf, mailLive, missing, money, overdue, rowFile, rowsOf, us, useEngine, view } from "@/lib/engine";
 import { cn, downloadBytes } from "@/lib/utils";
 
 const due = (r: Row) => (r.adue || 0) + (r.pdue || 0);
@@ -25,12 +25,14 @@ export default function PayTown() {
     const m: Record<string, Case[]> = {};
     queue.forEach((c) => { const k = c.muni || "Municipality not set"; (m[k] = m[k] || []).push(c); });
     return Object.entries(m).map(([muni, L]) => ({
-      muni, L, amt: L.reduce((t, c) => t + rowsOf(c).reduce((s, r) => s + due(r), 0), 0), ready: L.filter(ready).length,
+      muni, L, amt: L.filter((c) => !isRefund(c)).reduce((t, c) => t + caseArb(c) + casePat(c), 0),
+      back: L.filter(isRefund).reduce((t, c) => t + Math.abs(caseArb(c) + casePat(c)), 0), ready: L.filter(ready).length,
     })).sort((a, b) => b.L.length - a.L.length || b.amt - a.amt);
   }, [queue]);
   const town = towns.find((t) => t.muni === sp.get("town")) ?? towns[0];
   const open = sp.get("case");
   const total = towns.reduce((t, x) => t + x.amt, 0);
+  const totalBack = towns.reduce((t, x) => t + x.back, 0);
   const missingN = queue.filter((c) => !ready(c)).length;
   const { busy, run } = useAction();
 
@@ -46,10 +48,10 @@ export default function PayTown() {
 
   return (
     <>
-      <PageTitle title="3 · Pay the town" who="Priscilla" ends="the taxes are paid at the town (in person). Cases are grouped by town, so one trip pays them all." />
+      <PageTitle title="3 · Pay the town" who="Priscilla" ends="the taxes are paid at the town (in person), or the refund is claimed when the cost went down. Cases are grouped by town, so one trip does them all." />
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Kpi label="Ready to pay" value={queue.length} sub={`cases in this step · limit ${limitOf("C")} days`} edge={EDGE.navy} />
-        <Kpi label="To pay" value={money(total)} sub="arbitrios + patentes, our figure" edge={EDGE.navy} />
+        <Kpi label="To pay" value={money(total)} sub={totalBack ? `arbitrios + patentes · ${money(totalBack)} to claim back` : "arbitrios + patentes, our figure"} edge={EDGE.navy} />
         <Kpi label="Towns" value={towns.length} sub="one trip each" edge={EDGE.amber} />
         <Kpi label="Papers missing" value={missingN} sub="cases not ready to take" edge={EDGE.red} />
       </div>
@@ -75,7 +77,7 @@ export default function PayTown() {
                     town?.muni === t.muni ? "border-navy bg-[#f3f6fb] shadow-[inset_0_0_0_1px_#1F3864]" : "border-line hover:border-navy")}>
                   <span className="text-[13px] font-bold">{t.muni}</span>
                   <span className="text-lg font-bold tnum">{t.L.length}</span>
-                  <span className="text-xs text-mute">{money(t.amt)} · {t.ready} ready</span>
+                  <span className="text-xs text-mute">{money(t.amt)}{t.back ? ` · ${money(t.back)} back` : ""} · {t.ready} ready</span>
                 </button>
               ))}
             </div>
@@ -86,7 +88,7 @@ export default function PayTown() {
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-4">
                 <div>
                   <h2 className="m-0 text-lg font-bold">{town.muni} · route sheet</h2>
-                  <p className="mt-0.5 text-xs text-mute">{town.L.length} case{town.L.length === 1 ? "" : "s"} · <b className="text-ink">{money(town.amt)} to pay</b> · {town.ready} of {town.L.length} ready to take</p>
+                  <p className="mt-0.5 text-xs text-mute">{town.L.length} case{town.L.length === 1 ? "" : "s"} · <b className="text-ink">{money(town.amt)} to pay</b>{town.back ? <> · <b className="text-bad-ink">{money(town.back)} to claim back</b></> : null} · {town.ready} of {town.L.length} ready to take</p>
                 </div>
                 <div className="flex gap-2">
                   <Btn kind="outline" busy={busy === "pack"} onClick={printPack}><Printer className="h-4 w-4" />Print one pack for this trip</Btn>
@@ -101,10 +103,10 @@ export default function PayTown() {
                     const miss = LEGEND.filter(([k]) => !p[k as keyof typeof p]).map(([, n]) => n);
                     return (
                       <tr key={c.rid} className={cn(open === c.cs && "bg-[#f3f6fb]")}>
-                        <td className="td"><b>{c.cs}</b><div className="text-xs text-mute">{c.pcoc ? `New permit ${c.pcoc} · ` : ""}<span className={cn(overdue(c) && "font-semibold text-bad-ink")}>{daysOf(c)} days</span></div></td>
-                        <td className="td text-right">{money(R.reduce((t, r) => t + r.amt, 0))}</td>
-                        <td className="td text-right">{money(R.reduce((t, r) => t + (r.adue || 0), 0))}</td>
-                        <td className="td text-right">{money(R.reduce((t, r) => t + (r.pdue || 0), 0))}</td>
+                        <td className="td"><b>{c.cs}</b>{isRefund(c) && <> <Pill tone="bad">Refund</Pill></>}<div className="text-xs text-mute">{c.pcoc ? `New permit ${c.pcoc} · ` : ""}<span className={cn(overdue(c) && "font-semibold text-bad-ink")}>{daysOf(c)} days</span></div></td>
+                        <td className="td text-right">{money(caseAmt(c))}</td>
+                        <td className={cn("td text-right", isRefund(c) && "text-bad-ink")}>{money(Math.abs(caseArb(c)))}{isRefund(c) ? " back" : ""}</td>
+                        <td className={cn("td text-right", isRefund(c) && "text-bad-ink")}>{money(Math.abs(casePat(c)))}{isRefund(c) ? " back" : ""}</td>
                         <td className="td whitespace-nowrap">{LEGEND.map(([k, n]) => {
                           const ok = p[k as keyof typeof p];
                           return <span key={k} title={`${n}: ${ok ? "in hand" : "missing"}`} className={cn("mr-1 inline-flex h-6 w-6 items-center justify-center rounded-md text-[10.5px] font-bold",
@@ -119,7 +121,7 @@ export default function PayTown() {
               </table>
               <div className="flex flex-wrap gap-4 px-5 py-3 text-xs text-mute">
                 {LEGEND.map(([k, n]) => <span key={k}><b className="text-ink">{k}</b> {n}</span>)}
-                <span>The town gets these four and nothing else.</span>
+                <span>The town gets these four and nothing else. For a refund claim, bring the same four.</span>
               </div>
             </section>
           )}
@@ -139,6 +141,7 @@ function PayCase({ c }: { c: Case }) {
   const r1 = R.find((r) => r.d1 || r.l1), r3 = R.find((r) => r.d3 || r.l3), r0 = R[0];
   const rs = R.find((r) => r.sheet);
   const [paid, setPaid] = useState(c.paid);
+  const refund = isRefund(c);
   const [falReq, setFalReq] = useState(c.falReq);
   const [pcoc, setPcoc] = useState(c.pcoc);
   const m = missing(c);
@@ -184,11 +187,13 @@ function PayCase({ c }: { c: Case }) {
       </div>
 
       <div className="grid grid-cols-1 gap-3 border-t border-[#eef1f6] px-5 py-3.5 md:grid-cols-3">
-        <DateField label="Taxes paid on" value={paid} onChange={setPaid} />
+        <DateField label={refund ? "Refund claimed on" : "Taxes paid on"} value={paid} onChange={setPaid} />
         <DateField label="Asked the PMs for the letter on" value={falReq} onChange={setFalReq} />
         <TextField label="New permit number (PCOC)" value={pcoc} onChange={setPcoc} placeholder="2025-123456-PCOC-123456" />
       </div>
-      <ActionBar note={<>With the paid date in, this case moves to <b>4 · Proof to the PA</b>. Put what the town actually charged in Payments, or log the trip.</>}>
+      <ActionBar note={refund
+        ? <>The cost went down: <b>claim the refund</b> at the town with the same four papers. With the claim date in, this case moves to <b>4 · Proof to the PA</b>. Log the trip as "Refund claim".</>
+        : <>With the paid date in, this case moves to <b>4 · Proof to the PA</b>. Put what the town actually charged in Payments, or log the trip.</>}>
         <Btn kind="go" busy={busy === "save"} onClick={() => saveCase({ dates: { paid, falReq }, texts: { pcoc } })}>Save</Btn>
         <Link className="btn border-[#cfd6e2] bg-white text-navy no-underline hover:border-navy" to={`/trips?town=${encodeURIComponent(c.muni)}&case=${encodeURIComponent(c.cs)}`}>Log the trip (optional)</Link>
       </ActionBar>

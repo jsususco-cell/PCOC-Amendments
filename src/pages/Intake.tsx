@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Btn, Confirm, Empty, PageTitle, Pill, useAction } from "@/components/ui";
-import { type Case, PC, canStart, cases, intakeCases, structurePending, latestAppr, money, msOf, rowsOf, us, useEngine } from "@/lib/engine";
+import { type Case, PC, canStart, caseAmt, cases, isRefund, intakeCases, structurePending, latestAppr, money, msOf, rowsOf, us, useEngine } from "@/lib/engine";
 import { cn } from "@/lib/utils";
 
 type Decision = { c: Case; kind: "amend" | "notreq"; label: string };
@@ -30,7 +30,7 @@ export default function Intake() {
       <PageTitle title="Intake" who="Priscilla" ends="each new scope change is started in 1 · Prepare, or marked not required." />
       <div className="next">
         New scope changes come in every morning from Canopy (approved after the permit, construction cost only; temporary relocation does not count).
-        {" "}<b>Start 1 · Prepare</b> opens only when the construction cost went <b>up</b>, the Structure inspection passed (rebuilt houses) and the <b>Substantial/Finishes</b> inspection passed. A case leaves Intake when it is started or marked not required.
+        {" "}<b>Start 1 · Prepare</b> opens only when the construction cost <b>changed</b> (up or down), the Structure inspection passed (rebuilt houses) and the <b>Substantial/Finishes</b> inspection passed. When the cost went down it follows the <b>refund path</b>: the same steps, but in Step 3 the town gives the money back. A case leaves Intake when it is started or marked not required.
         Rebuilt houses whose Structure inspection has not passed are left out ({cases().filter(structurePending).length} now); they come in once it passes.
       </div>
 
@@ -48,7 +48,7 @@ export default function Intake() {
             <tbody>
               {list.map((c) => {
                 const R = rowsOf(c);
-                const amt = R.reduce((t, r) => t + (r.amt || 0), 0);
+                const amt = caseAmt(c);
                 const sp = R.find((r) => r.sp)?.sp ?? msOf(c).structure ?? "";
                 const go = canStart(c);
                 const sub = msOf(c).substantial;
@@ -79,7 +79,7 @@ export default function Intake() {
       </section>
 
       <Confirm open={!!ask} title={ask ? `${ask.c.cs}: ${ask.label}?` : ""} action={ask?.label ?? ""}
-        body={ask && <>This sets every open scope change on <b>{ask.c.cs}</b> ({rowsOf(ask.c).length}) and the case itself. {ask.kind === "amend" ? "The case moves to 1 · Prepare, and its Stage Note gets a dated “Started 1 · Prepare” line." : "It leaves Intake."}</>}
+        body={ask && <>This sets every open scope change on <b>{ask.c.cs}</b> ({rowsOf(ask.c).length}) and the case itself. {ask.kind === "amend" ? (isRefund(ask.c) ? "The cost went down, so it follows the refund path: same steps, and in Step 3 you claim the money back from the town. Its scope changes stay marked as a refund." : "The case moves to 1 · Prepare, and its Stage Note gets a dated “Started 1 · Prepare” line.") : "It leaves Intake."}</>}
         onCancel={() => setAsk(null)} onOk={() => { const d = ask!; setAsk(null); decide(d); }} />
     </>
   );

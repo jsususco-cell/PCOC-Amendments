@@ -199,14 +199,19 @@ PC.saveTrip=function(o){
   o=o||{};
   if(!o.muni) return Promise.reject(new Error('Pick the town.'));
   if(!o.cases||!o.cases.length) return Promise.reject(new Error('Tick at least one case.'));
-  if(!o.photo&&!o.roster&&o.outcome!=='Paid') return Promise.reject(new Error('Add a photo with the date and time, or of the sign-in sheet. The Program asks for proof.'));
+  /* A refund claim that was filed is stored as outcome "Other" (the Outcome
+     choices stay as they are) and does what "Paid" does for a payment:
+     it puts the date on the case, which moves it to 4 · Proof. */
+  var claim=o.purpose==='Refund claim'&&o.outcome==='Claim filed';
+  if(claim&&!o.photo&&!o.receipt) return Promise.reject(new Error('Add the town receipt for the claim, or a photo of it.'));
+  if(!claim&&!o.photo&&!o.roster&&o.outcome!=='Paid') return Promise.reject(new Error('Add a photo with the date and time, or of the sign-in sheet. The Program asks for proof.'));
   var inst=o.time?new Date(o.time).getTime():Date.now(), t=appMs(inst);
-  var paidRows=(o.pay&&o.pay.rows||[]).filter(function(x){ return Number(x.amt)>0; });
+  var paidRows=claim?[]:(o.pay&&o.pay.rows||[]).filter(function(x){ return Number(x.amt)>0; });
   var amt=Number(o.amt)||paidRows.reduce(function(s,x){ return s+Number(x.amt); },0);
   if(o.outcome==='Paid'&&paidRows.length&&!(o.pay&&o.pay.pm)) return Promise.reject(new Error('Say how it was paid.'));
   if(o.outcome==='Paid'&&o.pay&&o.pay.pm==='Credit Card'&&!o.pay.card) return Promise.reject(new Error('Which card paid it?'));
-  var v={t:String(inst),muni:o.muni,who:o.who||'',purpose:o.purpose||'Amendment taxes',outcome:o.outcome||'Paid',amt:amt,note:o.note||'',cases:o.cases.join(', '),roster:!!o.roster};
-  var note=canopyNote(v);
+  var v={t:String(inst),muni:o.muni,who:o.who||'',purpose:o.purpose||'Amendment taxes',outcome:claim?'Other':(o.outcome||'Paid'),amt:claim?0:amt,note:claim?('Refund claim filed.'+(o.note?' '+o.note:'')):(o.note||''),cases:o.cases.join(', '),roster:!!o.roster};
+  var note=v.purpose==='Refund claim'?refundNote(v,claim):canopyNote(v);
   var fl=[[o.photo,13],[o.roster,14],[o.receipt,15]].filter(function(x){ return x[0]; });
   return Promise.all(fl.map(function(x){ return b64of(x[0]).then(function(b){ return '<field fid="'+x[1]+'" filename="'+esc(x[0].name)+'">'+b+'</field>'; }); }))
     .then(function(parts){
@@ -215,7 +220,7 @@ PC.saveTrip=function(o){
       return xml2(VT,'API_AddRecord',inner);
     })
     .then(function(){
-      if(v.outcome!=='Paid') return;
+      if(v.outcome!=='Paid'&&!claim) return;
       var iso=prIso(inst);
       return Promise.all(G.cases.filter(function(c){ return o.cases.indexOf(c.cs)>=0&&!c.paid; }).map(function(c){
         c.paid=iso; var ns=derive(c), inner='<rid>'+c.rid+'</rid><field fid="27">'+gmdy(iso)+'</field>';
@@ -525,7 +530,8 @@ PC.markOf=function(c){ var m=String(c.note||'').match(INTAKE_MARK); return m?m[0
 PC.noteText=function(c){ return String(c.note||'').replace(INTAKE_MARK,'').replace(/^\n+/,''); };
 PC.noteSave=function(c,txt){ var m=PC.markOf(c); return m?(m+(txt?'\n'+txt:'')):(txt||''); };
 function stepWork(c){ return !!(c.narr||c.estChk||c.drwReq||c.drwRec||c.falReq||c.scopeReq||c.sentPA||rowsOf(c).some(function(r){ return r.estOn; })); }
-function amtOf(c){ return rowsOf(c).reduce(function(t,r){ return t+(Number(r.amt)||0); },0); }
+/* Every row of a case carries the whole case's amount: count it once. */
+function amtOf(c){ var r=rowsOf(c).filter(function(x){ return Number(x.amt); })[0]; return r?Number(r.amt):0; }
 function structOk(c){ return rowsOf(c).some(function(r){ return r.sp; })||!!PC.msOf(c).structure; }
 PC.isIntake=function(c){
   if(!rowsOf(c).length) return false;
@@ -536,7 +542,6 @@ PC.isIntake=function(c){
 };
 PC.canStart=function(c){
   var a=amtOf(c);
-  if(a<0) return {ok:false,why:'Cost went down. Refunds need their own path (not decided yet).'};
   if(Math.abs(a)<0.005) return {ok:false,why:'No cost change. Mark it Not required.'};
   if(c.fam==='RECON'&&!structOk(c)) return {ok:false,why:'Waiting for Structure.'};
   if(!PC.msOf(c).substantial) return {ok:false,why:'Waiting for Substantial/Finishes.'};
@@ -545,10 +550,39 @@ PC.canStart=function(c){
 PC.start=function(rid){
   var c=caseByRid(rid); if(!c) return Promise.reject(new Error('Case not found.'));
   var q=PC.canStart(c); if(!q.ok) return Promise.reject(new Error(q.why));
-  var rest=PC.noteText(c), note='Started 1 \u00b7 Prepare on '+us(gtoday())+'.'+(rest?'\n'+rest:'');
+  var rest=PC.noteText(c), note='Started 1 · Prepare on '+us(gtoday())+'.'+(rest?'\n'+rest:'');
   return xml2(CT,'API_EditRecord','<rid>'+c.rid+'</rid><field fid="43">'+esc(note)+'</field>')
-    .then(function(){ c.note=note; return PC.decide(rid,'amend'); });
+    .then(function(){
+      c.note=note;
+      /* A refund keeps its rows as "Refund — money back to us": only the case moves to Step 1. */
+      if(refundCase(c)) return xml2(CT,'API_EditRecord','<rid>'+c.rid+'</rid><field fid="10">A · Prepare request</field><field fid="11">'+gmdy(gtoday())+'</field>').then(function(){ return gLoad(); });
+      return PC.decide(rid,'amend');
+    });
 };
 /* An unstarted Step 1 case reads as Intake everywhere, so the Step 1
    automations (scope request email, auto-built papers) leave it alone. */
 function stOf(c){ var s=window.__p177.stOf(c); return (s&&s.k==='A'&&PC.isIntake(c))?INTAKE_STG:s; }
+
+/* ---------- Refund path (Priscilla, 2026-10-08) ----------
+   When the construction cost went DOWN the PA still amends the permit, and
+   the town gives back the extra arbitrios and patente. Same 5 steps; only
+   Step 3 changes: claim the refund at the town instead of paying. The case's
+   "Taxes Paid On" date (fid 27) holds the date the refund claim was filed. */
+function refundCase(c){ return amtOf(c)<0; }
+PC.refundCase=refundCase;
+var __next0=PC.next;
+PC.next=function(c){
+  var out=__next0(c); if(!refundCase(c)) return out;
+  return out.map(function(t){
+    if(/^Go to the town and pay/.test(t)) return 'Go to the town and claim the refund. Put in the date you filed the claim.';
+    if(/tax receipt or the town letter/.test(t)) return 'Upload the town receipt or letter for the refund claim.';
+    return t;
+  });
+};
+function refundNote(o,filed){
+  var when=vdt(o.t), cs=o.cases||'the case';
+  var base='On '+when+', Byrdson Services ('+(o.who||'staff')+') went to the Municipio de '+o.muni+' to claim the refund of the arbitrios and patente overpaid on the construction permit, now amended to a lower cost, for '+cs+'.';
+  if(filed) return base+' The refund claim was filed'+(o.note?': '+o.note:'')+'. Evidence on file in Quickbase.';
+  var why={'No one available to take payment':'no one was available at the municipality to take the claim','Office closed':'the office was closed','System down':'the municipality\'s system was down','Documents refused':'the municipality did not accept the documents presented'}[o.outcome]||'the claim could not be filed';
+  return base+' The claim could not be filed: '+why+'.'+(o.note?' '+o.note:'')+' Evidence (time-stamped photo'+(o.roster?' and sign-in sheet':'')+') is on file in Quickbase. Byrdson will return to file it.';
+}

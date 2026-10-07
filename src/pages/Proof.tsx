@@ -4,7 +4,7 @@ import { ActionBar, Btn, DateField, DocRow, EDGE, FileBtn, HeldBanner, Kpi, Next
 import CaseLookup, { FromBanner } from "@/components/CaseLookup";
 import CaseHead from "@/components/CaseHead";
 import MailNote, { mailToast } from "@/components/MailNote";
-import { type Case, PC, caseFile, fname, have, inStep, limitOf, mailLive, missing, rowFile, rowsOf, us, useEngine, view } from "@/lib/engine";
+import { type Case, PC, caseFile, fname, have, inStep, isRefund, limitOf, mailLive, missing, rowFile, rowsOf, us, useEngine, view } from "@/lib/engine";
 import { useSelectedCase } from "@/lib/useCase";
 
 export default function Proof() {
@@ -37,12 +37,13 @@ function ProofCase({ c }: { c: Case }) {
   const [stkr, setStkr] = useState(c.stkr);
   const [closeSent, setCloseSent] = useState(c.closeSent);
   const proofOk = h.sign && (h.cert || !!rr);
+  const refund = isRefund(c);
   const m = missing(c);
   const save = (o: object, ok = "Saved.") => run("save", () => PC().saveCase(c.rid, o), (r: { stage: string; from: string }) => r?.stage && r.from && r.stage !== r.from ? `${ok} ${c.cs} moved to ${r.stage}.` : ok);
 
   return (
     <section className="card">
-      <CaseHead c={c} right={c.paid ? <p className="mt-1.5 text-xs text-mute">Paid {us(c.paid)}</p> : null} />
+      <CaseHead c={c} right={c.paid ? <p className="mt-1.5 text-xs text-mute">{refund ? "Refund claimed" : "Paid"} {us(c.paid)}</p> : null} />
       <FromBanner c={c} stepKey="D"><span className="text-xs text-mute">Put in "Taxes paid on" in 3 · Pay the town first: then it moves here by itself.</span></FromBanner>
       {m[0] && <div className="mx-5 mb-3.5"><NextBox>{m[0]}</NextBox></div>}
       <DocRow state={h.sign ? "ok" : c.stkr ? "wait" : "no"} name="Sticker with the new permit number on the job sign"
@@ -56,7 +57,7 @@ function ProofCase({ c }: { c: Case }) {
         {c.sign && <Btn kind="outline" onClick={() => view(caseFile(c, 30), `Sign photo - ${c.cs}`)}><Eye className="h-4 w-4" />View</Btn>}
         <FileBtn label={c.sign ? "Replace" : "Upload photo"} accept="image/*,.pdf" busy={busy === "save"} onFile={(f) => save({ files: { sign: f } }, "Sign photo saved.")} />
       </DocRow>
-      <DocRow state={h.cert || rr ? "ok" : "no"} name="Proof we paid: town receipt or town letter (certificación)"
+      <DocRow state={h.cert || rr ? "ok" : "no"} name={refund ? "Proof of the refund claim: town receipt or town letter" : "Proof we paid: town receipt or town letter (certificación)"}
         detail={c.cert ? `Town letter: ${c.cert}` : rr ? `Receipt: ${fname(rr.rcpt)}` : "Upload the town letter, or log the trip with its receipt."}
         pill={h.cert || rr ? <Pill tone="ok">On file</Pill> : <Pill tone="bad">Missing</Pill>}>
         {rr && <Btn kind="outline" onClick={() => view(rowFile(rr, 38), `Receipt - ${c.cs}`)}><Eye className="h-4 w-4" />Receipt</Btn>}
@@ -70,7 +71,7 @@ function ProofCase({ c }: { c: Case }) {
       <ActionBar note={<>Sending moves this case to <b>5 · PCOC issued</b> once the email has gone out, or when "Proof sent to the PA on" has a date.</>}>
         <Btn kind="go" busy={busy === "close"} disabled={!proofOk} onClick={() => run("close", () => PC().mail(c.rid, "close"), mailToast)}><Send className="h-4 w-4" />Send proof to the PA</Btn>
         <Btn kind="outline" busy={busy === "save"} onClick={() => save({ dates: { stkr, closeSent } })}>Save</Btn>
-        <span className="text-[13px]">{proofOk ? <MailNote c={c} kind="close" /> : <>Still needed: <b>{[!h.sign && "the sign photo", !(h.cert || rr) && "the receipt or town letter"].filter(Boolean).join(" and ")}</b>.</>}</span>
+        <span className="text-[13px]">{proofOk ? <MailNote c={c} kind="close" /> : <>Still needed: <b>{[!h.sign && "the sign photo", !(h.cert || rr) && (refund ? "the town receipt or letter for the refund claim" : "the receipt or town letter")].filter(Boolean).join(" and ")}</b>.</>}</span>
       </ActionBar>
     </section>
   );

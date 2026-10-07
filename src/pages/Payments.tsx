@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { X } from "lucide-react";
 import { Btn, EDGE, Empty, Kpi, PageTitle, Pill, useAction } from "@/components/ui";
-import { type Row, PC, fname, money, owes, rowFile, rows, us, useEngine, view } from "@/lib/engine";
+import { type Row, PC, fname, money, owes, perCase, rowFile, rows, us, useEngine, view } from "@/lib/engine";
 import { cn } from "@/lib/utils";
 
 const PMETH = ["", "Credit Card", "Company Check", "Cashier's Check", "ACH / Wire", "Cash", "Money Order", "Paid by PA / Expediter"];
@@ -43,8 +43,8 @@ export default function Payments() {
       </PageTitle>
       <p className="-mt-3 text-[13px] text-mute">Money for each Canopy scope change. For Priscilla and the managers. Click a row to edit it on the right. The amendment status is never changed here.</p>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Kpi label="Added scope" value={money(R.reduce((t, r) => t + (r.amt || 0), 0))} sub={`${R.length} scope changes · ${uniq(R)} cases`} edge={EDGE.navy} />
-        <Kpi label="Tax we expect" value={money(R.reduce((t, r) => t + (r.adue || 0) + (r.pdue || 0), 0))} sub="arbitrios + patentes, our figure" edge={EDGE.amber} />
+        <Kpi label="Added scope" value={money(perCase(R, (r) => r.amt))} sub={`${R.length} scope changes · ${uniq(R)} cases`} edge={EDGE.navy} />
+        <Kpi label="Tax we expect" value={money(perCase(R, (r) => (r.adue || 0) + (r.pdue || 0)))} sub="arbitrios + patentes, our figure" edge={EDGE.amber} />
         <Kpi label="Paid" value={money(paidRows.reduce((t, r) => t + (Number(r.arb) || 0), 0))} sub={`${paidRows.length} scope changes`} edge={EDGE.green} />
         <Kpi label="Paid, no job cost" value={noJc.length} sub="not posted to CC Purchase Submissions" edge={EDGE.red} />
       </div>

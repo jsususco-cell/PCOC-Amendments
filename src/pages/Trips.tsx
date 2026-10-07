@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Copy } from "lucide-react";
 import { Btn, Empty, PageTitle, Pill, useAction } from "@/components/ui";
-import { PC, W, cases, money, owes, rowsOf, us, useEngine, view } from "@/lib/engine";
+import { PC, W, cases, isRefund, money, owes, rowsOf, us, useEngine, view } from "@/lib/engine";
 import { cn } from "@/lib/utils";
 
 const OUT = ["Paid", "No one available to take payment", "Office closed", "System down", "Documents refused", "Other"];
@@ -18,8 +18,10 @@ export default function Trips() {
   const [muni, setMuni] = useState(sp.get("town") ?? "");
   const [time, setTime] = useState(localNow());
   const [who, setWho] = useState<string>(PC().user?.name ?? "");
-  const [purpose, setPurpose] = useState(PUR[0]);
-  const [outcome, setOutcome] = useState(OUT[0]);
+  const [purpose, setPurpose] = useState(() => { const c0 = cases().find((c) => c.cs === sp.get("case")); return c0 && isRefund(c0) ? "Refund claim" : PUR[0]; });
+  const [outcome, setOutcome] = useState(() => (cases().find((c) => c.cs === sp.get("case")) && isRefund(cases().find((c) => c.cs === sp.get("case"))!) ? "Claim filed" : OUT[0]));
+  /* A refund claim: "Claim filed" does what "Paid" does (stored as Outcome "Other"). */
+  const outs = purpose === "Refund claim" ? ["Claim filed", ...OUT.slice(1)] : OUT;
   const [note, setNote] = useState("");
   const [pm, setPm] = useState(PMETH[0]);
   const [card, setCard] = useState("");
@@ -34,6 +36,7 @@ export default function Trips() {
 
   const list = cases().filter((c) => c.muni === muni && ((W.inFlow(c) as boolean) || c.stage === "Finished · confirm with Priscilla"));
   const paid = outcome === "Paid";
+  const claim = outcome === "Claim filed";
   const payRows = paid ? list.filter((c) => picked.includes(c.cs)).flatMap((c) => rowsOf(c).filter((r) => owes(r) || (!Number(r.arb) && (r.adue || r.pdue)))) : [];
   const total = payRows.reduce((t, r) => t + (Number(amts[r.rid]) || 0), 0);
 
@@ -46,7 +49,7 @@ export default function Trips() {
   }).then((r: { note: string; posted: string[] }) => {
     setDone(r); setPicked([]); setAmts({}); setPhoto(null); setRoster(null); setReceipt(null); setNote("");
     return r;
-  }), (r: { posted: string[] }) => paid ? `Trip saved. Paid cases moved to Proof.${r.posted.length ? ` Job cost posted: ${r.posted.join(", ")}.` : ""}` : "Trip saved. Copy the Canopy note below.");
+  }), (r: { posted: string[] }) => claim ? "Trip saved. Refund claim filed: the cases moved to Proof." : paid ? `Trip saved. Paid cases moved to Proof.${r.posted.length ? ` Job cost posted: ${r.posted.join(", ")}.` : ""}` : "Trip saved. Copy the Canopy note below.");
 
   return (
     <>
@@ -64,8 +67,8 @@ export default function Trips() {
             </label>
             <label className="label">Date and time<input type="datetime-local" className="input" value={time} onChange={(e) => setTime(e.target.value)} /></label>
             <label className="label">Who went<input className="input" value={who} onChange={(e) => setWho(e.target.value)} placeholder="name" /></label>
-            <label className="label">Why you went<select className="input" value={purpose} onChange={(e) => setPurpose(e.target.value)}>{PUR.map((x) => <option key={x}>{x}</option>)}</select></label>
-            <label className="label">What happened<select className="input" value={outcome} onChange={(e) => setOutcome(e.target.value)}>{OUT.map((x) => <option key={x}>{x}</option>)}</select></label>
+            <label className="label">Why you went<select className="input" value={purpose} onChange={(e) => { setPurpose(e.target.value); setOutcome(e.target.value === "Refund claim" ? "Claim filed" : OUT[0]); }}>{PUR.map((x) => <option key={x}>{x}</option>)}</select></label>
+            <label className="label">What happened<select className="input" value={outcome} onChange={(e) => setOutcome(e.target.value)}>{outs.map((x) => <option key={x}>{x}</option>)}</select></label>
             {paid && <label className="label">How paid<select className="input" value={pm} onChange={(e) => setPm(e.target.value)}>{PMETH.map((x) => <option key={x}>{x}</option>)}</select></label>}
             {paid && pm === "Credit Card" && <label className="label">Which card<select className="input" value={card} onChange={(e) => setCard(e.target.value)}><option value=""></option>{CARDS.map((x) => <option key={x}>{x}</option>)}</select></label>}
             {paid && <label className="label">Check no. / last 4 / confirmation<input className="input" value={pref} onChange={(e) => setPref(e.target.value)} /></label>}
@@ -114,7 +117,7 @@ export default function Trips() {
           <label className="label">Note<textarea rows={2} className="input h-auto py-2" placeholder="Who did you talk to? What did they say?" value={note} onChange={(e) => setNote(e.target.value)} /></label>
           <div className="flex flex-wrap items-center gap-3">
             <Btn kind="go" busy={busy === "save"} onClick={save}>Save this trip</Btn>
-            <span className="text-xs text-mute">{paid ? <>Paid cases move to <b>4 · Proof to the PA</b>.</> : "The Canopy note is written for you."}</span>
+            <span className="text-xs text-mute">{claim ? <>Add the town receipt for the claim. The cases move to <b>4 · Proof to the PA</b>.</> : paid ? <>Paid cases move to <b>4 · Proof to the PA</b>.</> : "The Canopy note is written for you."}</span>
           </div>
           {done && (
             <div className="rounded-lg border border-[#c4e3d0] bg-[#eef6f1] p-3 text-[13px]">

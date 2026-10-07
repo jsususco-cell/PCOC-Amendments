@@ -99,6 +99,8 @@ export const pathOf = (c: Case): string => {
 export const isIntake = (c: Case): boolean => !!PC().isIntake(c);
 /** Whether Start 1 · Prepare is allowed: cost went up, Structure (rebuilt houses) and Substantial passed. */
 export const canStart = (c: Case): { ok: boolean; why: string } => PC().canStart(c);
+/** Refund path: the construction cost went DOWN, so the town gives arbitrios and patente back. */
+export const isRefund = (c: Case): boolean => !!PC().refundCase(c);
 /** Stage Note without the Start mark, and the note to save with the mark kept. */
 export const noteText = (c: Case): string => PC().noteText(c);
 export const noteSave = (c: Case, txt: string): string => PC().noteSave(c, txt);
@@ -107,6 +109,19 @@ export const structurePending = (c: Case): boolean => c.stage === "Waiting · St
 export const latestAppr = (c: Case): string => rowsOf(c).map((r) => r.appr).sort().pop() ?? "";
 export const intakeCases = (): Case[] =>
   cases().filter(isIntake).sort((a, b) => latestAppr(b).localeCompare(latestAppr(a)));
+
+/** Every money row of a case carries the WHOLE case's amounts (construction now − at permit, and the
+ *  taxes on it), so a case is counted once, from its first row with an amount, as page 177 did.
+ *  Adding up the rows double-counts a case with two scope changes. */
+export const caseRow = (c: Case): Row | undefined => rowsOf(c).find((r) => r.amt) ?? rowsOf(c)[0];
+export const caseAmt = (c: Case): number => caseRow(c)?.amt ?? 0;
+export const caseArb = (c: Case): number => caseRow(c)?.adue ?? 0;
+export const casePat = (c: Case): number => caseRow(c)?.pdue ?? 0;
+/** The same rule over a list of rows (one figure per case). */
+export const perCase = (R: Row[], f: (r: Row) => number): number => {
+  const seen = new Set<string>();
+  return R.filter((r) => r.amt).reduce((t, r) => (seen.has(r.cs) ? t : (seen.add(r.cs), t + (f(r) || 0))), 0);
+};
 
 export const sumRows =(c: Case, f: (r: Row) => number) => rowsOf(c).reduce((t, r) => t + (f(r) || 0), 0);
 
