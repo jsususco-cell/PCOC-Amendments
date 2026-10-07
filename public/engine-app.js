@@ -449,8 +449,8 @@ PC.handoff=function(rid,to){
   if(!to) return Promise.reject(new Error('Type Leslie\'s email first.'));
   var r1=rowsOf(c).filter(function(r){ return r.d1; })[0];
   var body='Hi Leslie,\n\nThe permit amendment for '+c.cs+' is done. The PA issued the PCOC'+(c.closed?' on '+us(c.closed):'')+', so the use permit can start.\n\n'
-    +caseHead(c)+(c.pcoc?'New permit number (PCOC): '+c.pcoc+'\n':'')+(c.paid?'Amendment taxes paid: '+us(c.paid)+'\n':'')
-    +'\nThe papers are in the case folder in Drive (05 Permits / Amendment).\n\nThank you,\nByrdson Services PCOC team';
+    +caseHead(c)+(c.pcoc?'New permit number (PCOC): '+c.pcoc+'\n':'')+(c.paid?(refundCase(c)?'Refund claimed at the town: ':'Amendment taxes paid: ')+us(c.paid)+'\n':'')
+    +'\nThe Permit Amendment Notification is attached. The other papers are on the case in the PCOC Amendments app (saved in Quickbase).\n\nThank you,\nByrdson Services PCOC team';
   return qmail(c,HANDOFF,to,'','PCOC listo, puede empezar el permiso de uso - '+c.cs,body,[r1?qurl(TID,r1.rid,46):null].filter(Boolean))
     .then(function(st){ emit('change'); return st; });
 };
