@@ -29,8 +29,9 @@ export default function PayTown() {
       back: L.filter(isRefund).reduce((t, c) => t + Math.abs(caseArb(c) + casePat(c)), 0), ready: L.filter(ready).length,
     })).sort((a, b) => b.L.length - a.L.length || b.amt - a.amt);
   }, [queue]);
-  const town = towns.find((t) => t.muni === sp.get("town")) ?? towns[0];
   const open = sp.get("case");
+  /* A link to a case opens its own town, not the first one in the list. */
+  const town = towns.find((t) => t.muni === sp.get("town")) ?? towns.find((t) => t.L.some((c) => c.cs === open)) ?? towns[0];
   const total = towns.reduce((t, x) => t + x.amt, 0);
   const totalBack = towns.reduce((t, x) => t + x.back, 0);
   const missingN = queue.filter((c) => !ready(c)).length;

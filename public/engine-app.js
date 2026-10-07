@@ -586,3 +586,39 @@ function refundNote(o,filed){
   var why={'No one available to take payment':'no one was available at the municipality to take the claim','Office closed':'the office was closed','System down':'the municipality\'s system was down','Documents refused':'the municipality did not accept the documents presented'}[o.outcome]||'the claim could not be filed';
   return base+' The claim could not be filed: '+why+'.'+(o.note?' '+o.note:'')+' Evidence (time-stamped photo'+(o.roster?' and sign-in sheet':'')+') is on file in Quickbase. Byrdson will return to file it.';
 }
+
+/* ---------- Papers → Google Drive (one folder per case number) ----------
+   Quickbase stays the record; /api/drive copies the case's new or changed
+   papers into its Drive folder. Run a few seconds after any save that can add
+   or change a paper (several saves in a row make one copy). The nightly pass
+   catches anything saved elsewhere. Never blocks or fails the save itself. */
+var DRIVE_T={}, DRIVE_LAST={};
+PC.driveSync=function(rid,now){
+  if(!rid) return Promise.resolve(null);
+  clearTimeout(DRIVE_T[rid]);
+  var go=function(){
+    return fetch('/api/drive',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({rid:Number(rid)})})
+      .then(function(x){ return x.json().then(function(j){ if(!x.ok) throw new Error(j.error||('Drive copy failed ('+x.status+').')); return j; }); })
+      .then(function(j){ DRIVE_LAST[rid]=j; emit('drive',{rid:rid,result:j}); return j; })
+      .catch(function(e){ console.warn('drive',e); emit('drive',{rid:rid,error:e.message}); if(now) throw e; return null; });
+  };
+  if(now) return go();
+  DRIVE_T[rid]=setTimeout(go,4000);
+  return Promise.resolve(null);
+};
+PC.driveLast=function(rid){ return DRIVE_LAST[rid]||null; };
+function driveAfter(name,ridOf){
+  var f=PC[name]; if(typeof f!=='function') return;
+  PC[name]=function(){
+    var args=arguments;
+    return f.apply(this,args).then(function(res){ try{ [].concat(ridOf.apply(null,args)||[]).forEach(function(r){ PC.driveSync(r); }); }catch(e){} return res; });
+  };
+}
+function ridOfRow(rowRid){ var r=S.rows.filter(function(x){ return String(x.rid)===String(rowRid); })[0]; var c=r&&G.cases.filter(function(x){ return x.cs===r.cs; })[0]; return c?c.rid:null; }
+driveAfter('saveCase',function(rid){ return rid; });
+driveAfter('saveRowDocs',function(rid){ return rid; });
+driveAfter('buildDocs',function(rid){ return rid; });
+driveAfter('buildSheet',function(rid){ return rid; });
+driveAfter('buildPack',function(rid){ return rid; });
+driveAfter('savePayment',function(rowRid,v,receipt){ return receipt?ridOfRow(rowRid):null; });
+driveAfter('saveTrip',function(o){ return G.cases.filter(function(c){ return (o&&o.cases||[]).indexOf(c.cs)>=0; }).map(function(c){ return c.rid; }); });

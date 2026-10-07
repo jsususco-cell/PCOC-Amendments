@@ -1,6 +1,6 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Pill } from "./ui";
-import { type Case, caseAmt, daysOf, limitOf, money, msOf, overdue, rowsOf, stageOf, us } from "@/lib/engine";
+import { type Case, PC, caseAmt, daysOf, limitOf, money, msOf, overdue, rowsOf, stageOf, us } from "@/lib/engine";
 
 /** The top of a case card: number, who/where, money, step pill, Drive folder. */
 export default function CaseHead({ c, right }: { c: Case; right?: React.ReactNode }) {
@@ -30,12 +30,44 @@ export default function CaseHead({ c, right }: { c: Case; right?: React.ReactNod
           {s?.k === "I" ? "Intake" : s && s.k !== "X" ? `Step ${"ABCDE".indexOf(s.k) + 1}` : c.stage} · {daysOf(c)} days
         </Pill>
         {right}
-        <div className="mt-1">
-          {c.dfold
-            ? <a href={c.dfold} target="_blank" rel="noreferrer" className="text-xs">Open the Amendment folder in Drive</a>
-            : <span className="text-xs text-mute">Drive folder is being set up</span>}
-        </div>
+        <DrivePapers c={c} />
+        {c.dfold && (
+          <div className="mt-0.5">
+            <a href={c.dfold} target="_blank" rel="noreferrer" className="text-xs text-mute">Case folder in Drive (scope files)</a>
+          </div>
+        )}
       </div>
+    </div>
+  );
+}
+
+/** The case's PCOC papers folder in Drive (one folder per case number). Papers are copied there by
+ *  themselves after a save; "Copy now" does it on demand. */
+function DrivePapers({ c }: { c: Case }) {
+  const [link, setLink] = useState<string | null>(null);
+  const [state, setState] = useState<"" | "busy" | "err">("");
+  const [note, setNote] = useState("");
+  useEffect(() => {
+    let live = true;
+    fetch(`/api/drive?rid=${c.rid}`, { credentials: "same-origin" })
+      .then((r) => r.json()).then((j) => { if (live && j.folderLink) setLink(j.folderLink); }).catch(() => {});
+    const off = PC().on("drive", (d: { rid: string; result?: { folderLink: string | null; filed: string[]; replaced: string[]; errors: string[] }; error?: string }) => {
+      if (String(d.rid) !== String(c.rid) || !live) return;
+      if (d.error) { setState("err"); setNote(d.error); return; }
+      setState("");
+      if (d.result?.folderLink) setLink(d.result.folderLink);
+      const n = (d.result?.filed.length ?? 0) + (d.result?.replaced.length ?? 0);
+      setNote(d.result?.errors.length ? `Not copied: ${d.result.errors.join("; ")}` : n ? `${n} paper${n === 1 ? "" : "s"} copied just now` : "");
+    });
+    return () => { live = false; off(); };
+  }, [c.rid]);
+  const copy = () => { setState("busy"); PC().driveSync(c.rid, true).catch(() => {}); };
+  return (
+    <div className="mt-1 text-xs">
+      {link ? <a href={link} target="_blank" rel="noreferrer">Papers in Drive ({c.cs})</a> : <span className="text-mute">No papers in Drive yet</span>}
+      {" · "}
+      <button type="button" className="font-semibold text-navy underline disabled:opacity-60" disabled={state === "busy"} onClick={copy}>{state === "busy" ? "Copying…" : "Copy now"}</button>
+      {note && <div className={state === "err" ? "text-bad-ink" : "text-mute"}>{note}</div>}
     </div>
   );
 }
