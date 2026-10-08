@@ -4,7 +4,7 @@ import { ActionBar, Btn, DateField, EDGE, Empty, HeldBanner, Kpi, NextBox, PageT
 import CaseLookup, { FromBanner } from "@/components/CaseLookup";
 import CaseHead from "@/components/CaseHead";
 import MailNote, { mailToast } from "@/components/MailNote";
-import { type Case, PC, daysOf, have, inStep, limitOf, mailLive, missing, rowFile, rowsOf, us, useEngine, view } from "@/lib/engine";
+import { type Case, PC, daysOf, fname, have, inStep, limitOf, mailLive, missing, rowFile, rowsOf, us, useEngine, view } from "@/lib/engine";
 import { useSelectedCase } from "@/lib/useCase";
 
 export default function WithPA() {
@@ -78,7 +78,7 @@ function WithPACase({ c }: { c: Case }) {
         <input type="file" accept=".pdf,image/*" className="hidden" onChange={(e) => setNpa(e.target.files?.[0] ?? null)} />
       </label>
       {r1 && (
-        <p className="mx-5 mt-2 text-xs">On file: <button className="font-semibold text-navy underline" onClick={() => r1.l1 ? window.open(r1.l1, "_blank") : view(rowFile(r1, 46), `Permit Amendment Notice - ${c.cs}`)}>{r1.d1 || "open (Drive)"}</button></p>
+        <p className="mx-5 mt-2 text-xs">On file: <button className="font-semibold text-navy underline" onClick={() => r1.l1 ? window.open(r1.l1, "_blank") : view(rowFile(r1, 46), `Permit Amendment Notice - ${c.cs}`)}>{fname(r1.d1) || "open (Drive)"}</button></p>
       )}
       <div className="grid grid-cols-1 gap-3 px-5 py-4 md:grid-cols-5">
         <TextField label="New permit number (PCOC)" value={f.pcoc} onChange={set("pcoc")} placeholder="2025-123456-PCOC-123456" />
