@@ -142,7 +142,10 @@ export async function syncCase(rid: number): Promise<SyncResult> {
 /** All cases, oldest work first, within a time budget (the nightly pass). */
 export async function syncAll(budgetMs = 250_000): Promise<{ done: number; total: number; filed: number; replaced: number; errors: string[] }> {
   const t0 = Date.now();
-  const all = await query(CT, [3, 6], "{3.GT.0}");
+  /* Papers belong to a case once it is worked on: cases still parked in Intake
+     or marked not required are left out ("Copy now" on a case still works). */
+  const PARKED = ["Refund owed to us", "Finished · confirm with Priscilla", "Waiting · Structure not passed", "Not required"];
+  const all = (await query(CT, [3, 6, 10], "{3.GT.0}")).filter((c) => !PARKED.includes(String(c[10]?.value ?? "")));
   /* Start somewhere else each night, so a night that runs out of time does
      not always leave the same cases for last. */
   const start = all.length ? (Math.floor(Date.now() / 864e5) * 17) % all.length : 0;
