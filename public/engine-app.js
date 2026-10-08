@@ -211,7 +211,7 @@ PC.saveTrip=function(o){
   if(o.outcome==='Paid'&&paidRows.length&&!(o.pay&&o.pay.pm)) return Promise.reject(new Error('Say how it was paid.'));
   if(o.outcome==='Paid'&&o.pay&&o.pay.pm==='Credit Card'&&!o.pay.card) return Promise.reject(new Error('Which card paid it?'));
   var v={t:String(inst),muni:o.muni,who:o.who||'',purpose:o.purpose||'Amendment taxes',outcome:claim?'Other':(o.outcome||'Paid'),amt:claim?0:amt,note:claim?('Refund claim filed.'+(o.note?' '+o.note:'')):(o.note||''),cases:o.cases.join(', '),roster:!!o.roster};
-  var note=v.purpose==='Refund claim'?refundNote(v,claim):canopyNote(v);
+  var note=v.purpose==='Refund claim'?refundNote({t:v.t,muni:v.muni,who:v.who,outcome:o.outcome,note:o.note||'',cases:v.cases,roster:v.roster},claim):canopyNote(v);
   var fl=[[o.photo,13],[o.roster,14],[o.receipt,15]].filter(function(x){ return x[0]; });
   return Promise.all(fl.map(function(x){ return b64of(x[0]).then(function(b){ return '<field fid="'+x[1]+'" filename="'+esc(x[0].name)+'">'+b+'</field>'; }); }))
     .then(function(parts){
@@ -225,7 +225,14 @@ PC.saveTrip=function(o){
       return Promise.all(G.cases.filter(function(c){ return o.cases.indexOf(c.cs)>=0&&!c.paid; }).map(function(c){
         c.paid=iso; var ns=derive(c), inner='<rid>'+c.rid+'</rid><field fid="27">'+gmdy(iso)+'</field>';
         if(ns!==c.stage) inner+='<field fid="10">'+esc(ns)+'</field><field fid="11">'+gmdy(gtoday())+'</field>';
-        return xml2(CT,'API_EditRecord',inner);
+        return xml2(CT,'API_EditRecord',inner).then(function(){
+          /* A filed refund claim: its town receipt is the proof Step 4 asks for. Put it on the
+             case's first scope-change row (Receipt, fid 38), as a payment's receipt is. */
+          var r0=rowsOf(c)[0];
+          if(!claim||!o.receipt||!r0||r0.rcpt) return null;
+          return b64of(o.receipt).then(function(b){ return xml('API_EditRecord','<rid>'+r0.rid+'</rid><field fid="38" filename="'+esc(o.receipt.name)+'">'+b+'</field>'); })
+            .then(function(){ r0.rcpt=o.receipt.name; });
+        });
       })).then(function(){
         var p=o.pay||{}, ch=Promise.resolve(), posted=[];
         paidRows.forEach(function(x){ ch=ch.then(function(){
@@ -324,7 +331,9 @@ PC.buildDocs=function(rid){
     })
     .then(function(x){ return x.json().then(function(j){ if(!x.ok) throw new Error(j.error||('The papers could not be made ('+x.status+').')); return j; }); })
     .then(function(j){ result=j; return j.narrative==='skipped' ? ownNarrative(c,parsed).then(function(){ result.narrative='pcoc'; }) : null; })
-    .then(function(){ return gLoad(); })
+    /* The estimate is saved on the scope-change rows: reload them too, not
+       only the cases, or the page says "Cost Estimate missing" until a refresh. */
+    .then(function(){ return PC.reload(); })
     .then(function(){ return {c:caseByRid(rid)||c, result:result}; });
 };
 
@@ -592,11 +601,22 @@ function refundNote(o,filed){
    papers into its Drive folder. Run a few seconds after any save that can add
    or change a paper (several saves in a row make one copy). The nightly pass
    catches anything saved elsewhere. Never blocks or fails the save itself. */
-var DRIVE_T={}, DRIVE_LAST={};
+var DRIVE_T={}, DRIVE_LAST={}, DRIVE_RUN={}, DRIVE_AGAIN={};
 PC.driveSync=function(rid,now){
   if(!rid) return Promise.resolve(null);
   clearTimeout(DRIVE_T[rid]);
+  /* One copy per case at a time: two at once would both create the same new
+     file in Drive. A save during a copy runs one more copy after it. */
   var go=function(){
+    if(DRIVE_RUN[rid]){ DRIVE_AGAIN[rid]=true; return DRIVE_RUN[rid]; }
+    DRIVE_RUN[rid]=once().then(function(j){
+      DRIVE_RUN[rid]=null;
+      if(DRIVE_AGAIN[rid]){ DRIVE_AGAIN[rid]=false; return go(); }
+      return j;
+    },function(e){ DRIVE_RUN[rid]=null; throw e; });
+    return DRIVE_RUN[rid];
+  };
+  var once=function(){
     return fetch('/api/drive',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({rid:Number(rid)})})
       .then(function(x){ return x.json().then(function(j){ if(!x.ok) throw new Error(j.error||('Drive copy failed ('+x.status+').')); return j; }); })
       .then(function(j){ DRIVE_LAST[rid]=j; emit('drive',{rid:rid,result:j}); return j; })

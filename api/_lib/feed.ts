@@ -78,6 +78,8 @@ export interface NewRow {
   cs: string; scopeChangeId: string; type: string; approved: string; permitDate: string; permitFrom: string;
   permitNo: string; family: string; constructionStatus: string; structure: string; municipality: string; address: string;
   job: number | null; toChange: number; atPermit: number; now: number; amount: number; status: string;
+  /** This scope change's own construction change (the amount column of the calculation sheet's list). */
+  change: number;
   buckets: Record<number, number>;
 }
 export interface Review { cs: string; rowNow: number; canopyNow: number; difference: number; newer: string[] }
@@ -112,11 +114,11 @@ export async function buildPlan(): Promise<Plan> {
     const permitFrom = job ? PERMIT_ORDER.find((k) => isoDate(val(job, JF[k]))) ?? "" : "";
     const permit = permitFrom ? isoDate(val(job, JF[permitFrom as keyof typeof JF])) : "";
     const redPrevOf = (r: Rec) => (str(r, SCF.redPrev) === "" ? val(r, SCF.redRev) : val(r, SCF.redPrev));
+    const deltaOf = (r: Rec) => cons(num(val(r, SCF.hardRev)), num(val(r, SCF.capRev)), num(val(r, SCF.redRev)))
+      - cons(num(val(r, SCF.hardPrev)), num(val(r, SCF.capPrev)), num(redPrevOf(r)));
     const counting = list.filter((r) => {
       const d = isoDate(val(r, SCF.approved));
-      const delta = cons(num(val(r, SCF.hardRev)), num(val(r, SCF.capRev)), num(val(r, SCF.redRev)))
-        - cons(num(val(r, SCF.hardPrev)), num(val(r, SCF.capPrev)), num(redPrevOf(r)));
-      return d && (!permit || d > permit) && Math.abs(delta) >= 0.01;
+      return d && (!permit || d > permit) && Math.abs(deltaOf(r)) >= 0.01;
     });
     if (!counting.length) continue;
     if (!permit) { plan.noPermitDate.push(cs); continue; }
@@ -165,7 +167,7 @@ export async function buildPlan(): Promise<Plan> {
         cs, scopeChangeId: str(r, SCF.id), type: str(r, SCF.type), approved: isoDate(val(r, SCF.approved)),
         permitDate: permit, permitFrom, permitNo: job ? str(job, JF.permitNo) : "", family, constructionStatus: consStatus,
         structure, municipality: str(r, SCF.muni), address: str(r, SCF.addr), job: Number(str(r, SCF.job)) || null,
-        toChange: num(val(r, SCF.toChg)), atPermit, now, amount, status,
+        toChange: num(val(r, SCF.toChg)), atPermit, now, amount, status, change: round(deltaOf(r)),
         buckets: { 73: hA, 74: hN, 75: cA, 76: cN, 77: sA, 78: sN, 79: tA, 80: tN, 81: rA, 82: rN, 83: xA, 84: xN, 85: oA, 86: oN },
       });
     }
@@ -173,6 +175,15 @@ export async function buildPlan(): Promise<Plan> {
   plan.rows.sort((a, b) => a.status.localeCompare(b.status) || b.approved.localeCompare(a.approved));
   plan.review.sort((a, b) => Math.abs(b.difference) - Math.abs(a.difference));
   return plan;
+}
+
+const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const longDay = (iso: string) => { const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[3]} ${MON[Number(m[2]) - 1]} ${m[1]}` : iso; };
+/** The list the calculation sheet prints ("Approved scope changes since the permit"), in the original import's format. */
+export function changeBlock(list: { approved: string; scopeChangeId: string; type: string; change: number }[]): string[] {
+  const L = [...list].sort((a, b) => a.approved.localeCompare(b.approved));
+  return [`Approved scope changes since the permit (${L.length}):`,
+    ...L.map((r) => `  ${longDay(r.approved)}  ${r.scopeChangeId.padEnd(10)} ${r.type.slice(0, 38).padEnd(38)} ${money(r.change)}`)];
 }
 
 /** Case stage for a new case, from its rows (page 177's rowStage, plus Verify → confirm). */
@@ -221,6 +232,7 @@ export async function applyPlan(plan: Plan): Promise<{ casesAdded: number; rowsA
       `Construction cost now:            ${money(r0.now)}`,
       `${r0.amount < 0 ? "Decrease" : "Increase"} since the permit:        ${money(r0.amount)}`, "",
       rt.rate ? `Arbitrio ${rt.rate}%: ${money(adue)}${rt.prate ? ` · Patente ${rt.prate}%: ${money(pdue)}` : ""}` : `No rate on file yet for ${r0.municipality || "this municipality"}.`,
+      "", ...changeBlock(list),
       "", `Added by the PCOC feed from Canopy on ${today}. Permit date from Jobs field "${r0.permitFrom}".`,
     ].join("\n");
     await upsert(T.ROWS, list.map((r) => {

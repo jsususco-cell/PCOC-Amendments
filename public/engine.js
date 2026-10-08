@@ -2990,7 +2990,7 @@ function mDrawings(c){
 
 function mPA(c){
 
-  var body='Saludos,\n\nFavor de tramitar la Notificacion de Enmienda al Permiso de Construccion del siguiente caso. El alcance aumento por cambios aprobados por el Programa despues de emitido el permiso.\n\n'
+  var body='Saludos,\n\nFavor de tramitar la Notificacion de Enmienda al Permiso de Construccion del siguiente caso. '+(refundCase(c)?'El costo de construccion se redujo por cambios aprobados por el Programa despues de emitido el permiso.':'El alcance aumento por cambios aprobados por el Programa despues de emitido el permiso.')+'\n\n'
 
    +caseHead(c)+'\nAdjuntamos:\n  1. Planos revisados\n  2. Narrativa del proyecto revisada\n  3. Estimado de costos revisado\n\nFavor de confirmar cuando la notificacion este lista.\n\nGracias,\nByrdson Services, LLC';
 

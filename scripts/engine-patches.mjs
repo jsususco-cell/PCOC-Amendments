@@ -46,6 +46,10 @@ export const PATCHES = [
   ["if(r.prate>0) row2('Patente sobre el aumento ('+(r.prate||0)+'%)',money(r.pdue));",
    "if(r.prate>0) row2('Patente sobre '+(r.amt<0?'la reduccion':'el aumento')+' ('+(r.prate||0)+'%)',money(Math.abs(r.pdue)));"],
 
+  // Amendment request email to the PA
+  ["El alcance aumento por cambios aprobados por el Programa despues de emitido el permiso.\\n\\n'",
+   "'+(refundCase(c)?'El costo de construccion se redujo por cambios aprobados por el Programa despues de emitido el permiso.':'El alcance aumento por cambios aprobados por el Programa despues de emitido el permiso.')+'\\n\\n'"],
+
   // Close-out email to the PA
   ["(c.paid?'Impuestos pagados: '+us(c.paid)+'\\n':'')",
    "(c.paid?(refundCase(c)?'Reembolso reclamado al municipio: ':'Impuestos pagados: ')+us(c.paid)+'\\n':'')"],
